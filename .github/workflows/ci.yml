@@ -1,14 +1,17 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
+
+# `push: main` trigger は意図的に外している。PR の auto-merge gate (lib-ci +
+# coverage が green でないと merge できない) で main 品質を保つ前提なので、
+# main push 後に同じ lib-ci + coverage を再走させるのは無駄。main push 起点で
+# 走るのは dev-release.yml だけ。
 
 permissions:
   contents: write
@@ -60,7 +63,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: mcp-relay-rs-coverage
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          # ci.yml は PR でしか走らないので main 限定 save 制約は外す。
+          # base branch (main 由来 PR) で save される。
 
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@v2
