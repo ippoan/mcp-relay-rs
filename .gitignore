@@ -1,2 +1,7 @@
 /target
 Cargo.lock
+
+# coverage_gate.sh の出力
+coverage.txt
+coverage_summary.txt
+lcov.info
