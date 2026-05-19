@@ -1,0 +1,27 @@
+name: Tag Release
+
+# workflow_dispatch で `v{major}.{minor}.{patch}` tag を採番 + push する。
+# 本 repo は lib crate なので binary release.yml は無く、tag 自体が deliverable
+# (consumer の Cargo.toml `tag = "v0.0.x"` が解決可能になる)。
+#
+# 起動方法:
+#   1. ci-dashboard UI → "Tag Release" ボタン
+#   2. CLI: gh workflow run tag-release.yml -R ippoan/mcp-relay-rs
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump (patch / minor / major)"
+        type: string
+        default: "patch"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    uses: ippoan/ci-workflows/.github/workflows/tag-release.yml@main
+    with:
+      bump: ${{ inputs.bump }}
+    secrets: inherit
