@@ -1,14 +1,16 @@
 name: Dev Release
 
-# main 上の lib 変更を自動で `dev-N` tag として打つ (counter モード)。
-# binary release は無いので、tag 自体が consumer の Cargo.toml
-# `tag = "dev-N"` を解決可能にする deliverable。
+# main 上の lib 変更を自動で `dev-N` tag 採番 + push + GitHub Release 作成
+# (--prerelease) を 1-workflow で完結させる。
 #
-# `/tag-release patch` の prod release と独立。dev はあくまで consumer
-# 開発中の "main HEAD を pin したい" 用途で、stable は `v0.0.x` を使う。
+# `ippoan/ci-workflows/dev-tag-release.yml` の Mode B (create_release: true) を
+# 使うので TAG_RELEASE_PAT は不要 (GITHUB_TOKEN だけで push + release 作成可能)。
+# 本 repo は lib crate なので binary build / asset attach も無い。
 #
-# 採番は `ippoan/ci-workflows/dev-tag-release.yml` reusable (counter モード):
-# 既存 `dev-*` tag の max N+1 を push する。同一 HEAD への再発火は skip。
+# 旧 design: tag push → release.yml (`on: push: tags: ["dev-*"]`) を別 workflow
+# 発火させる 2-step chain は、tag push を GITHUB_TOKEN でやると他 workflow が
+# trigger されない GitHub Actions の制約があり TAG_RELEASE_PAT が必須だった。
+# create_release: true で内部完結させることでこの制約から脱却している。
 
 on:
   push:
@@ -25,5 +27,7 @@ permissions:
 jobs:
   dev-release:
     uses: ippoan/ci-workflows/.github/workflows/dev-tag-release.yml@main
-    secrets:
-      TAG_RELEASE_PAT: ${{ secrets.TAG_RELEASE_PAT }}
+    with:
+      create_release: true
+    permissions:
+      contents: write

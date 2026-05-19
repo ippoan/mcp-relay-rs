@@ -1,0 +1,27 @@
+# Files the coverage gate enforces 100% line coverage on. Same shape as
+# `ippoan/cc-relay`'s convention adapted for this single-crate lib.
+# Files NOT listed are excluded entirely by `--ignore-filename-regex`
+# in `scripts/coverage_gate.sh` — they are 1-3 line shims or modules
+# that still need real-server mocks to test (`auth.rs` RFC 8628 polling,
+# `relay/mod.rs` outbound WS loop).
+#
+# 拡張方針: 100% を維持しながら段階的に enforced list を広げていく。
+# Out of scope (Phase 2 では未 enforce、別 issue で対応):
+#   - src/auth.rs        (device flow polling — needs mock OAuth server)
+#   - src/relay/mod.rs   (real outbound WS loop — needs mock WS server)
+#   - src/lib.rs         (pure module re-exports, llvm-cov emits 0 regions)
+
+[[files]]
+path = "src/config.rs"
+
+[[files]]
+path = "src/token_cache.rs"
+
+[[files]]
+path = "src/pair.rs"
+
+[[files]]
+path = "src/relay/frame.rs"
+
+[[files]]
+path = "src/relay/bridge.rs"
