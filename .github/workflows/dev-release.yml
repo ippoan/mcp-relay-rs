@@ -11,8 +11,6 @@ name: Dev Release
 # 発火させる 2-step chain は、tag push を GITHUB_TOKEN でやると他 workflow が
 # trigger されない GitHub Actions の制約があり TAG_RELEASE_PAT が必須だった。
 # create_release: true で内部完結させることでこの制約から脱却している。
-#
-# branch ref 注: ci-workflows#19 が main merge されたら `@main` に戻す。
 
 on:
   push:
@@ -28,7 +26,7 @@ permissions:
 
 jobs:
   dev-release:
-    uses: ippoan/ci-workflows/.github/workflows/dev-tag-release.yml@feat/inline-release-in-tag-reusables
+    uses: ippoan/ci-workflows/.github/workflows/dev-tag-release.yml@main
     with:
       create_release: true
     permissions:

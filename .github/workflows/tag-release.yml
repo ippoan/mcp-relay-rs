@@ -9,8 +9,6 @@ name: Tag Release
 # 起動方法:
 #   - ci-dashboard UI → "Tag Release" ボタン
 #   - CLI: gh workflow run tag-release.yml -R ippoan/mcp-relay-rs -f bump=patch
-#
-# branch ref 注: ci-workflows#19 が main merge されたら `@main` に戻す。
 
 on:
   workflow_dispatch:
@@ -26,7 +24,7 @@ permissions:
 
 jobs:
   tag-release:
-    uses: ippoan/ci-workflows/.github/workflows/tag-release.yml@feat/inline-release-in-tag-reusables
+    uses: ippoan/ci-workflows/.github/workflows/tag-release.yml@main
     with:
       bump: ${{ inputs.bump }}
       create_release: true
