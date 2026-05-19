@@ -83,3 +83,8 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+    secrets:
+      # TAG_RELEASE_PAT を auto-merge にも渡すことで、merge commit が PAT 作者で
+      # push される → post-merge workflow (dev-release.yml 等) が GitHub Actions
+      # の "GITHUB_TOKEN events don't trigger workflows" 制約を回避して発火する。
+      AUTO_MERGE_PAT: ${{ secrets.TAG_RELEASE_PAT }}
