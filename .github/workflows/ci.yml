@@ -42,14 +42,43 @@ jobs:
       - name: cargo test
         run: cargo test --all-targets --all-features --no-fail-fast
 
+  # 100% line coverage gate on files registered in coverage_100.toml.
+  # Convention copied from ippoan/cc-relay (scripts/coverage_gate.sh +
+  # scripts/coverage_allowlist.txt + coverage_100.toml).
+  coverage:
+    name: coverage
+    runs-on: ubuntu-latest
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: mcp-relay-rs-coverage
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+
+      - name: cargo llvm-cov + 100% gate
+        run: bash scripts/coverage_gate.sh
+
   auto-merge:
     name: Auto Merge
-    needs: [lib-ci]
+    needs: [lib-ci, coverage]
     if: >-
       always() &&
       github.event_name == 'pull_request' &&
       github.event.pull_request.draft == false &&
-      needs.lib-ci.result == 'success'
+      needs.lib-ci.result == 'success' &&
+      needs.coverage.result == 'success'
     uses: ippoan/ci-workflows/.github/workflows/auto-merge.yml@main
     permissions:
       contents: write

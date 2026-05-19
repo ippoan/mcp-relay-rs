@@ -1,0 +1,25 @@
+# Lines tolerated by `scripts/coverage_gate.sh` despite reporting zero
+# execution count. Each entry is `<rel-path>:<line>` followed by a
+# `# reason`. Reviewers should push back on any new addition without a
+# concrete justification.
+#
+# Convention adopted from `ippoan/cc-relay` — opt-in 100% enforcement
+# on files listed in `coverage_100.toml`, with per-line carve-outs
+# documented inline here.
+#
+# Categories:
+#
+# - **test-assertion-panic**: `match { ... _ => panic!("expected X") }`
+#   pattern. fires only if the assertion fails — unreachable on green CI.
+#
+# - **defensive-body-error**: `axum::Body` collect error path. reqwest/axum
+#   normal Body 実装 (Full / BoxBody from rmcp StreamableHttpService) は
+#   collect() で error を返さない。custom Body を作るためだけに 1 行のために
+#   mod 全体を refactor する価値が無いので allowlist。
+
+# --- test-assertion-panic ---
+src/relay/frame.rs:198  # `_ => panic!("expected Hello")` 残余 arm
+src/relay/frame.rs:252  # `else { panic!("expected Req") }`
+
+# --- defensive-body-error ---
+src/relay/bridge.rs:69  # `Err(e) => error_resp(500, "response collect failed: {e}")`

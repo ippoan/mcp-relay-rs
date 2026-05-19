@@ -178,4 +178,25 @@ mod tests {
             .to_string();
         assert!(err.contains("claim_login is empty"), "got: {err}");
     }
+
+    /// 200 OK だが pair_code / pair_url が空 (auth-worker のバグ等) なら
+    /// `bail!("response missing pair_code / pair_url")` に落ちる。
+    #[tokio::test]
+    async fn pair_new_empty_pair_code_bails() {
+        let mut server = mockito::Server::new_async().await;
+        let _m = server
+            .mock("POST", "/mcp/pair/new")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(r#"{"pair_code":"","pair_url":"","expires_in":300}"#)
+            .create_async()
+            .await;
+        let cfg = cfg_with_relay_base(&server.url());
+        let client = Client::new();
+        let err = pair_new(&client, &cfg, "alice", "0.1.0-test")
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("missing pair_code / pair_url"), "got: {err}");
+    }
 }
