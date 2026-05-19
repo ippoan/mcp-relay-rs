@@ -1,0 +1,38 @@
+[package]
+name = "mcp-relay"
+version = "0.0.1"
+edition = "2021"
+description = "Shared crate for MCP binary relay (auth-worker device flow + 1-click pair + WS frame relay)"
+license = "MIT"
+repository = "https://github.com/ippoan/mcp-relay-rs"
+
+[lib]
+name = "mcp_relay"
+path = "src/lib.rs"
+
+[dependencies]
+anyhow = "1"
+thiserror = "1"
+clap = { version = "4", features = ["derive", "env"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "sync"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-native-roots", "json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4", features = ["serde"] }
+directories = "5"
+tracing = "0.1"
+http = "1"
+http-body = "1"
+http-body-util = "0.1"
+bytes = "1"
+tower = { version = "0.5", features = ["util"] }
+axum = "0.8.9"
+tokio-tungstenite = { version = "0.24", default-features = false, features = ["connect", "handshake", "rustls-tls-native-roots"] }
+futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
+uuid = { version = "1", features = ["v4"] }
+base64 = "0.22"
+
+[dev-dependencies]
+mockito = "1"
+tempfile = "3"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "test-util", "io-util", "net", "sync"] }
