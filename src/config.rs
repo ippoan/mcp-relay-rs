@@ -208,6 +208,16 @@ mod tests {
     }
 
     #[test]
+    fn relay_public_url_unwraps_ws_to_http() {
+        // dev override で `--relay-base ws://localhost:..` を渡すケース
+        let c = cfg_with(AuthEnv::Staging, "ws://localhost:18099");
+        assert_eq!(
+            c.relay_public_url("dev"),
+            "http://localhost:18099/u/dev/mcp"
+        );
+    }
+
+    #[test]
     fn pair_new_url_https_staging() {
         let c = cfg_with(AuthEnv::Staging, "https://mcp-staging.ippoan.org");
         assert_eq!(
@@ -250,5 +260,45 @@ mod tests {
             "https://mcp-staging.ippoan.org"
         );
         assert_eq!(AuthEnv::Prod.default_relay_base(), "https://mcp.ippoan.org");
+    }
+
+    #[test]
+    fn auth_env_as_str_round_trip() {
+        assert_eq!(AuthEnv::Staging.as_str(), "staging");
+        assert_eq!(AuthEnv::Prod.as_str(), "prod");
+    }
+
+    #[test]
+    fn url_builds_with_leading_slash() {
+        let c = cfg_with(AuthEnv::Staging, "https://x");
+        assert_eq!(
+            c.url("/mcp/introspect"),
+            "https://auth-staging.ippoan.org/mcp/introspect"
+        );
+    }
+
+    #[test]
+    fn url_strips_trailing_slash_from_auth_base() {
+        let mut c = cfg_with(AuthEnv::Staging, "https://x");
+        c.auth_base = "https://example.com/".into();
+        assert_eq!(c.url("/foo"), "https://example.com/foo");
+    }
+
+    /// `token_cache_path` は `$HOME` を見て `ProjectDirs` を組む。テスト中は
+    /// `XDG_CONFIG_HOME` を tmp dir に向けて副作用を閉じる。Linux 上では
+    /// `ProjectDirs::config_dir()` が `$XDG_CONFIG_HOME/<project_name>` を返す。
+    /// 他 platform では path だけ違うが pass する。
+    #[test]
+    fn token_cache_path_uses_project_name_and_env_suffix() {
+        let tmp = tempfile::tempdir().unwrap();
+        // safety: 単一 test 内で env を一時上書き、tempdir drop で物理削除されるので副作用は閉じる。
+        unsafe {
+            std::env::set_var("XDG_CONFIG_HOME", tmp.path());
+        }
+        let c = cfg_with(AuthEnv::Staging, "https://x");
+        let path = c.token_cache_path().unwrap();
+        let s = path.to_string_lossy();
+        assert!(s.ends_with("token-staging.json"), "path: {s}");
+        assert!(s.contains("github-mcp-server-rs"), "path: {s}");
     }
 }

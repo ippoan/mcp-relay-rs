@@ -107,4 +107,22 @@ mod tests {
         // skew=10 → exp(now+30) <= now+10 → false
         assert!(!set.is_expired(10));
     }
+
+    #[test]
+    fn delete_removes_existing_file() {
+        let dir = tempdir().unwrap();
+        let p = dir.path().join("t.json");
+        sample().save(&p).unwrap();
+        assert!(p.exists());
+        TokenSet::delete(&p).unwrap();
+        assert!(!p.exists());
+    }
+
+    #[test]
+    fn delete_is_noop_when_missing() {
+        let dir = tempdir().unwrap();
+        let p = dir.path().join("not-there.json");
+        TokenSet::delete(&p).unwrap();
+        assert!(!p.exists());
+    }
 }
