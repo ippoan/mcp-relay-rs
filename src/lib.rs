@@ -17,6 +17,11 @@
 //!   binary 側 tools 実装は本 crate から見えない。
 //!
 //! Out of scope: tools/types/binary 固有 client (`worker_client.rs`/`admin_exec.rs` 等)。
+//!
+//! Release channels (see `.github/workflows/{dev-release,tag-release}.yml`):
+//! - `dev-N` (counter, auto from main push) — consumer の `Cargo.toml`
+//!   `tag = "dev-N"` で pin する用途
+//! - `v0.0.X` (semver, manual via workflow_dispatch) — stable
 
 pub mod auth;
 pub mod config;
