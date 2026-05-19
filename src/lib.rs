@@ -20,8 +20,11 @@
 //!
 //! Release channels (see `.github/workflows/{dev-release,tag-release}.yml`):
 //! - `dev-N` (counter, auto from main push) — consumer の `Cargo.toml`
-//!   `tag = "dev-N"` で pin する用途
-//! - `v0.0.X` (semver, manual via workflow_dispatch) — stable
+//!   `tag = "dev-N"` で pin する用途。dev-release.yml が
+//!   `ippoan/ci-workflows/dev-tag-release.yml@main` (Mode B: create_release=true)
+//!   を呼んで同 job 内で tag push + `gh release create --prerelease` を行う。
+//! - `v0.0.X` (semver, manual via workflow_dispatch) — stable。tag-release.yml
+//!   が同 reusable を Mode B + `--latest` で呼ぶ。
 
 pub mod auth;
 pub mod config;
