@@ -1,27 +1,34 @@
 name: Tag Release
 
-# workflow_dispatch で `v{major}.{minor}.{patch}` tag を採番 + push する。
-# 本 repo は lib crate なので binary release.yml は無く、tag 自体が deliverable
-# (consumer の Cargo.toml `tag = "v0.0.x"` が解決可能になる)。
+# workflow_dispatch で semver `v{major}.{minor}.{patch}` tag 採番 + push + GitHub Release
+# 作成 (--latest) を 1-workflow で完結させる。
+#
+# `ippoan/ci-workflows/tag-release.yml` の Mode B (create_release: true) を使うので
+# TAG_RELEASE_PAT は不要。binary asset attach も無し (lib crate)。
 #
 # 起動方法:
-#   1. ci-dashboard UI → "Tag Release" ボタン
-#   2. CLI: gh workflow run tag-release.yml -R ippoan/mcp-relay-rs
+#   - ci-dashboard UI → "Tag Release" ボタン
+#   - CLI: gh workflow run tag-release.yml -R ippoan/mcp-relay-rs -f bump=patch
+#
+# branch ref 注: ci-workflows#19 が main merge されたら `@main` に戻す。
 
 on:
   workflow_dispatch:
     inputs:
       bump:
         description: "Version bump (patch / minor / major)"
-        type: string
-        default: "patch"
+        type: choice
+        options: [patch, minor, major]
+        default: patch
 
 permissions:
   contents: write
 
 jobs:
-  release:
-    uses: ippoan/ci-workflows/.github/workflows/tag-release.yml@main
+  tag-release:
+    uses: ippoan/ci-workflows/.github/workflows/tag-release.yml@feat/inline-release-in-tag-reusables
     with:
       bump: ${{ inputs.bump }}
-    secrets: inherit
+      create_release: true
+    permissions:
+      contents: write
