@@ -1,0 +1,29 @@
+name: Dev Release
+
+# main 上の lib 変更を自動で `dev-N` tag として打つ (counter モード)。
+# binary release は無いので、tag 自体が consumer の Cargo.toml
+# `tag = "dev-N"` を解決可能にする deliverable。
+#
+# `/tag-release patch` の prod release と独立。dev はあくまで consumer
+# 開発中の "main HEAD を pin したい" 用途で、stable は `v0.0.x` を使う。
+#
+# 採番は `ippoan/ci-workflows/dev-tag-release.yml` reusable (counter モード):
+# 既存 `dev-*` tag の max N+1 を push する。同一 HEAD への再発火は skip。
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'Cargo.toml'
+      - '.github/workflows/dev-release.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  dev-release:
+    uses: ippoan/ci-workflows/.github/workflows/dev-tag-release.yml@main
+    secrets:
+      TAG_RELEASE_PAT: ${{ secrets.TAG_RELEASE_PAT }}
