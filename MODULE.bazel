@@ -1,0 +1,22 @@
+module(
+    name = "mcp_relay_rs",
+    version = "0.0.1",
+)
+
+bazel_dep(name = "rules_rust", version = "0.69.0")
+
+# crate_universe: Cargo.lock を slurp して `@crates` repo 配下に
+# 全 dep の rust_library/rust_proc_macro target を生成する。
+# rust-alc-api と同じ pattern (issue #9 Phase 1)。
+crate = use_extension(
+    "@rules_rust//crate_universe:extensions.bzl",
+    "crate",
+)
+
+crate.from_cargo(
+    name = "crates",
+    cargo_lockfile = "//:Cargo.lock",
+    manifests = ["//:Cargo.toml", "//crates/mcp-relay:Cargo.toml"],
+)
+
+use_repo(crate, "crates")

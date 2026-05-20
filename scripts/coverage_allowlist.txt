@@ -18,8 +18,9 @@
 #   mod 全体を refactor する価値が無いので allowlist。
 
 # --- test-assertion-panic ---
-src/relay/frame.rs:198  # `_ => panic!("expected Hello")` 残余 arm
-src/relay/frame.rs:252  # `else { panic!("expected Req") }`
+# Paths shifted to `crates/mcp-relay/src/...` in issue #9 Phase 1 monorepo化.
+crates/mcp-relay/src/relay/frame.rs:198  # `_ => panic!("expected Hello")` 残余 arm
+crates/mcp-relay/src/relay/frame.rs:252  # `else { panic!("expected Req") }`
 
 # --- defensive-body-error ---
-src/relay/bridge.rs:69  # `Err(e) => error_resp(500, "response collect failed: {e}")`
+crates/mcp-relay/src/relay/bridge.rs:69  # `Err(e) => error_resp(500, "response collect failed: {e}")`

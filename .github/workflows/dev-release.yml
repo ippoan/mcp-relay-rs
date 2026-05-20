@@ -16,9 +16,15 @@ on:
   push:
     branches: [main]
     paths:
-      - 'src/**'
-      - 'tests/**'
+      # Issue #9 Phase 1: sources are now under crates/<member>/src/**.
+      # Also re-trigger when Cargo.lock changes (dep bumps that affect
+      # binary build reproducibility, now tracked) or when any Bazel
+      # config moves (rules_rust version, crate.from_cargo manifests).
+      - 'crates/**'
+      - 'binaries/**'        # Phase 2/3 で binary 吸収後の予約
       - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'MODULE.bazel'
       - '.github/workflows/dev-release.yml'
 
 permissions:

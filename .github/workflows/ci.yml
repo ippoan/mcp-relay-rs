@@ -1,4 +1,4 @@
-name: CI
+name: ci
 
 on:
   pull_request:
@@ -8,46 +8,29 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-# `push: main` trigger は意図的に外している。PR の auto-merge gate (lib-ci +
-# coverage が green でないと merge できない) で main 品質を保つ前提なので、
-# main push 後に同じ lib-ci + coverage を再走させるのは無駄。main push 起点で
-# 走るのは dev-release.yml だけ。
+# `push: main` trigger は意図的に外している。PR の auto-merge gate
+# (ci / rustfmt / clippy / cargo test / cargo build --release / coverage /
+# bazel-build が全 green でないと merge できない) で main 品質を保つ前提なので、
+# main push 後に同じ test を再走させるのは無駄。main push 起点で走るのは
+# dev-release.yml だけ。
 
 permissions:
   contents: write
   pull-requests: write
 
 jobs:
-  # rust-ci.yml は binary 想定 (binary_name 必須 + --help smoke test) なので
-  # lib-only の本 crate ではここに直接 fmt / clippy / test を書く。
-  lib-ci:
-    name: lib CI
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install stable Rust + components
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-
-      - name: Cargo cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: mcp-relay-rs
-
-      - name: cargo fmt --check
-        run: cargo fmt --all -- --check
-
-      - name: cargo clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
-
-      - name: cargo test
-        run: cargo test --all-targets --all-features --no-fail-fast
+  # job key `ci` で local reusable を呼ぶことで、check name が
+  # `ci / rustfmt` / `ci / clippy` / `ci / cargo test` / `ci / cargo build --release`
+  # の 4 つになる (= `ippoan-rust-default` preset が要求する required check 名と一致)。
+  # 各 job の中身は `_lib-ci.yml` を参照。
+  ci:
+    uses: ./.github/workflows/_lib-ci.yml
+    with:
+      shared_key: mcp-relay-rs
 
   # 100% line coverage gate on files registered in coverage_100.toml.
-  # Convention copied from ippoan/cc-relay (scripts/coverage_gate.sh +
-  # scripts/coverage_allowlist.txt + coverage_100.toml).
+  # Issue #9 Phase 1 で path が `crates/mcp-relay/src/...` に shift したので
+  # scripts/coverage_gate.sh も `--workspace` 経由に更新済み。
   coverage:
     name: coverage
     runs-on: ubuntu-latest
@@ -63,8 +46,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: mcp-relay-rs-coverage
-          # ci.yml は PR でしか走らないので main 限定 save 制約は外す。
-          # base branch (main 由来 PR) で save される。
 
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@v2
@@ -74,15 +55,45 @@ jobs:
       - name: cargo llvm-cov + 100% gate
         run: bash scripts/coverage_gate.sh
 
+  # Bazel build (issue #9 Phase 1) — rust-alc-api と同じ `ippoan/setup-bazel@main`
+  # action で disk-cache + external-cache + repository-cache を有効化。matrix は
+  # Phase 2/3 で binary を吸収した時に `//binaries/<name>` を加えて split build に拡張。
+  #
+  # **ci (cargo 4 job) + coverage を gate に置く**: cargo 側が落ちている状態で
+  # Bazel build runner を回しても根本原因 reveal が遅れるだけで runner 時間の無駄
+  # なので、両方 success の時のみ起動する。
+  bazel-build:
+    name: bazel build
+    needs: [ci, coverage]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: mcp-relay-lib
+            targets: "//crates/mcp-relay:mcp-relay //crates/mcp-relay:mcp-relay_test"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ippoan/setup-bazel@main
+        with:
+          disk-cache: "bazel-${{ matrix.name }}"
+          external-cache: true
+          repository-cache: true
+
+      - name: Build (Bazel)
+        run: bazel build -c fastbuild --strip=always ${{ matrix.targets }}
+
   auto-merge:
     name: Auto Merge
-    needs: [lib-ci, coverage]
+    needs: [ci, coverage, bazel-build]
     if: >-
       always() &&
       github.event_name == 'pull_request' &&
       github.event.pull_request.draft == false &&
-      needs.lib-ci.result == 'success' &&
-      needs.coverage.result == 'success'
+      needs.ci.result == 'success' &&
+      needs.coverage.result == 'success' &&
+      needs.bazel-build.result == 'success'
     uses: ippoan/ci-workflows/.github/workflows/auto-merge.yml@main
     permissions:
       contents: write

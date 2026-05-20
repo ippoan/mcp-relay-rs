@@ -1,7 +1,16 @@
 /target
-Cargo.lock
+
+# Cargo.lock は workspace 化 (issue #9 Phase 1) で track に切り替える。
+# 理由:
+# - workspace に binary (Phase 2/3) が入ると Cargo.lock track が cargo 慣例
+# - Bazel `crate.from_cargo()` は Cargo.lock を slurp して `@crates` を生成するので
+#   commit 済が必須 (rust-alc-api と同じ運用)
+# - tag-release.yml の reproducibility にも効く (dep の floating bump を防ぐ)
 
 # coverage_gate.sh の出力
 coverage.txt
 coverage_summary.txt
 lcov.info
+
+# Bazel
+/bazel-*
