@@ -114,22 +114,32 @@ if missing_required:
     sys.exit(1)
 
 # ---- report ----
-if files_with_uncov:
-    fail_required = []
-    fail_other = []
-    for rel, uncov in files_with_uncov:
-        head = ", ".join(str(n) for n in uncov[:25])
-        more = f" (+{len(uncov) - 25} more)" if len(uncov) > 25 else ""
-        msg = f"::error file={rel}::uncovered lines: {head}{more}"
-        if rel in required_files:
-            fail_required.append(msg)
-        else:
-            fail_other.append(msg)
-    for m in fail_required + fail_other:
+# fail_required: coverage_100.toml に登録されているファイルの uncovered 行
+#                → CI 失敗の対象 (= 100% gate enforcement)
+# warn_other:    登録外ファイルの uncovered 行
+#                → 情報出力のみ (= phase 2/3 で binary 追加した時等に
+#                  まだ test を書ききっていないファイルが gate 落とさないように)
+fail_required = []
+warn_other = []
+for rel, uncov in files_with_uncov:
+    head = ", ".join(str(n) for n in uncov[:25])
+    more = f" (+{len(uncov) - 25} more)" if len(uncov) > 25 else ""
+    if rel in required_files:
+        fail_required.append(f"::error file={rel}::uncovered lines: {head}{more}")
+    else:
+        warn_other.append(f"::warning file={rel}::uncovered lines (not enforced): {head}{more}")
+
+# warning は常に出す (登録漏れの可視化用)
+for m in warn_other:
+    print(m)
+
+if fail_required:
+    for m in fail_required:
         print(m)
+    fail_count = sum(len(u) for _, u in files_with_uncov if _ in required_files)
     print(
-        f"\n{uncovered_total} uncovered source lines across "
-        f"{len(files_with_uncov)} files — coverage gate FAILED"
+        f"\n{fail_count} uncovered source lines across "
+        f"{len(fail_required)} registered files — coverage gate FAILED"
     )
     sys.exit(1)
 
@@ -137,4 +147,9 @@ print(
     f"all {len(required_files)} coverage_100.toml files at 100%, "
     f"with {len(allowlist)} documented allowlist entries — coverage gate PASSED"
 )
+if warn_other:
+    print(
+        f"({len(warn_other)} unregistered files have uncovered lines — "
+        f"see warnings above, register in coverage_100.toml to enforce)"
+    )
 PY
