@@ -415,6 +415,15 @@ where
             // auth-worker からの Hello は仕様上は無いが、forward-compat で無視。
             tracing::debug!("relay: ignoring Hello frame from peer");
         }
+        // auth-worker issue #178 (a): application-level keepalive ping。
+        // 同 id を pong で即返して、 DO 側の missedPings カウンタを 0 に戻す。
+        Frame::Ping { id, .. } => {
+            let _ = out.send(OutMsg::Frame(Frame::pong(id))).await;
+        }
+        Frame::Pong { .. } => {
+            // 仕様上 binary 側は Pong を受けない。 forward-compat で無視。
+            tracing::debug!("relay: ignoring Pong frame from peer");
+        }
     }
 }
 
@@ -715,6 +724,13 @@ where
         }
         Frame::Hello { .. } => {
             tracing::debug!("pair: ignoring Hello frame from peer");
+        }
+        // auth-worker issue #178 (a): application-level keepalive ping
+        Frame::Ping { id, .. } => {
+            let _ = out.send(OutMsg::Frame(Frame::pong(id))).await;
+        }
+        Frame::Pong { .. } => {
+            tracing::debug!("pair: ignoring Pong frame from peer");
         }
     }
 }

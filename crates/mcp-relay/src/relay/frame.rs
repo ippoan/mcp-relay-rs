@@ -64,7 +64,20 @@ pub enum Frame {
         /// fallback する。
         #[serde(default = "default_service_v1_compat")]
         service: String,
+        /// auth-worker issue #178 (a): application-level ping/pong keepalive
+        /// に binary が対応していれば `true`。 DO 側はこの field を見て ping
+        /// を送るか決める (旧 binary には ping を出さない、 後方互換)。
+        /// 旧 sender (field 無し) は false に倒れる。
+        #[serde(default)]
+        keepalive_supported: bool,
     },
+    /// auth-worker DO → binary, application-level keepalive ping (issue #178)。
+    /// binary は `Frame::Pong { id }` で即返す。 同 id を echo する事で
+    /// DO 側は「どの ping が応答済か」を一応 trace 可能 (現状の DO 実装は
+    /// id を見ずに最新の応答有無だけ使う)。
+    Ping { v: u32, id: String },
+    /// binary → auth-worker DO, Ping への即時応答 (issue #178)。
+    Pong { v: u32, id: String },
 }
 
 /// v1 frame (service field 無し) 受信時の fallback service id。Phase 1 までは
@@ -78,12 +91,26 @@ impl Frame {
     /// `Hello` frame を作る。`binary_version` は `CARGO_PKG_VERSION`、`service` は
     /// 各 binary の crate 名 (`"github-mcp-server-rs"` / `"ref-files-mcp-server-rs"`)
     /// を埋める想定。
+    ///
+    /// auth-worker issue #178: 本 crate がビルドする binary は ping/pong に
+    /// 対応しているため `keepalive_supported: true` を載せる。 旧 binary
+    /// (本 PR より前にビルドされた) は field を載せず、 auth-worker DO 側で
+    /// `serde(default)` により false 扱いになるので ping を受け取らない。
     pub fn hello(binary_version: impl Into<String>, service: impl Into<String>) -> Self {
         Frame::Hello {
             v: FRAME_VERSION,
             binary_version: binary_version.into(),
             proto: FRAME_VERSION,
             service: service.into(),
+            keepalive_supported: true,
+        }
+    }
+
+    /// auth-worker issue #178: 受信 `Ping { id }` への即応答 `Pong { id }` を組む。
+    pub fn pong(id: impl Into<String>) -> Self {
+        Frame::Pong {
+            v: FRAME_VERSION,
+            id: id.into(),
         }
     }
 
@@ -117,7 +144,11 @@ impl Frame {
     /// 受信側 version check 用。
     pub fn version(&self) -> u32 {
         match self {
-            Frame::Req { v, .. } | Frame::Resp { v, .. } | Frame::Hello { v, .. } => *v,
+            Frame::Req { v, .. }
+            | Frame::Resp { v, .. }
+            | Frame::Hello { v, .. }
+            | Frame::Ping { v, .. }
+            | Frame::Pong { v, .. } => *v,
         }
     }
 }
@@ -194,8 +225,56 @@ mod tests {
         let s = r#"{"kind":"hello","v":1,"binary_version":"0.0.16","proto":1}"#;
         let f = Frame::from_json(s).unwrap();
         match f {
-            Frame::Hello { service, .. } => assert_eq!(service, "github-mcp-server-rs"),
+            Frame::Hello {
+                service,
+                keepalive_supported,
+                ..
+            } => {
+                assert_eq!(service, "github-mcp-server-rs");
+                // issue #178: 旧 sender が `keepalive_supported` を載せて
+                // いない場合は default false に倒れる
+                assert!(!keepalive_supported);
+            }
             _ => panic!("expected Hello"),
+        }
+    }
+
+    /// auth-worker issue #178: `Frame::hello()` が新規 ping/pong 対応を opt-in
+    /// した状態で Hello を生成する事を保証する。
+    #[test]
+    fn hello_builder_advertises_keepalive_support() {
+        let f = Frame::hello("0.4.0", "github-mcp-server-rs");
+        match f {
+            Frame::Hello {
+                keepalive_supported,
+                ..
+            } => assert!(keepalive_supported),
+            _ => panic!("expected Hello"),
+        }
+    }
+
+    /// auth-worker issue #178: Ping frame の roundtrip + `pong(id)` builder で
+    /// 同 id を echo した Pong frame を作れる事を確認する。
+    #[test]
+    fn ping_pong_roundtrip_and_builder() {
+        let ping = Frame::Ping {
+            v: FRAME_VERSION,
+            id: "ping-1".into(),
+        };
+        let s = ping.to_json().unwrap();
+        let parsed = Frame::from_json(&s).unwrap();
+        assert_eq!(parsed, ping);
+
+        let pong = Frame::pong("ping-1");
+        let s = pong.to_json().unwrap();
+        let parsed2 = Frame::from_json(&s).unwrap();
+        assert_eq!(parsed2, pong);
+        match parsed2 {
+            Frame::Pong { id, v } => {
+                assert_eq!(id, "ping-1");
+                assert_eq!(v, FRAME_VERSION);
+            }
+            _ => panic!("expected Pong"),
         }
     }
 
