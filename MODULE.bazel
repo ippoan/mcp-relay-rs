@@ -16,7 +16,11 @@ crate = use_extension(
 crate.from_cargo(
     name = "crates",
     cargo_lockfile = "//:Cargo.lock",
-    manifests = ["//:Cargo.toml", "//crates/mcp-relay:Cargo.toml"],
+    manifests = [
+        "//:Cargo.toml",
+        "//crates/mcp-relay:Cargo.toml",
+        "//binaries/github-mcp-server-rs:Cargo.toml",
+    ],
 )
 
 use_repo(crate, "crates")

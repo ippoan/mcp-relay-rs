@@ -72,6 +72,11 @@ jobs:
         include:
           - name: mcp-relay-lib
             targets: "//crates/mcp-relay:mcp-relay //crates/mcp-relay:mcp-relay_test"
+          # Phase 2 (issue #9): github-mcp-server-rs を吸収。
+          # disk-cache を別 key にすることで lib 側の変更で binary cache が
+          # 巻き添えにならず、cache hit 率が高い状態を維持できる。
+          - name: github-mcp-server-rs
+            targets: "//binaries/github-mcp-server-rs:github-mcp-server-rs"
     steps:
       - uses: actions/checkout@v4
 
