@@ -15,13 +15,17 @@ rust_binary(
     ],
     proc_macro_deps = all_crate_deps(proc_macro = True),
     edition = "2021",
+    # `build.rs` が cargo path で `cargo:rustc-env=BUILD_RELEASE_TAG=<tag>` を
+    # 発行する。Bazel は build script を別経路で扱う (= `cargo_build_script` rule
+    # が必要) ので、ここでは dev/CI build 用に空 string を直接 inject。main.rs 側に
+    # `if env!("BUILD_RELEASE_TAG").is_empty() { CARGO_PKG_VERSION } else { ... }` の
+    # fallback がある (build.rs の git ref 取得失敗時と同じ branch)。
+    # release artifact を Bazel で作る時 (Phase 2.B) に `cargo_build_script` 化する。
+    rustc_env = {
+        "BUILD_RELEASE_TAG": "",
+    },
     visibility = ["//visibility:public"],
 )
-
-# `build.rs` 由来の version embed 情報 (`BUILD_RELEASE_TAG` 等) は cargo 経路でのみ
-# 適用される。Bazel は build script を別経路で扱うため、必要なら `cargo_build_script`
-# rule で wrapping するが、今は dev/CI build としては不要なので未対応。
-# Phase 2 follow-up: release artifact を Bazel で作る時に対応する。
 
 rust_test(
     name = "github-mcp-server-rs_test",
@@ -31,4 +35,7 @@ rust_test(
     ],
     proc_macro_deps = all_crate_deps(proc_macro_dev = True),
     edition = "2021",
+    rustc_env = {
+        "BUILD_RELEASE_TAG": "",
+    },
 )
