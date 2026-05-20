@@ -89,13 +89,35 @@ BIN="$INSTALL_DIR/$BIN_NAME"
 TAG_FILE="$BIN.tag"
 
 CHANNEL="${REF_FILES_MCP_CHANNEL:-stable}"
+
+# Resolve tags via `git ls-remote --tags` when a CCoW git proxy is reachable
+# (the attached consumer repo's origin URL is of the form
+# `http://local_proxy@127.0.0.1:<port>/git/<owner>/<repo>` — Anthropic's per-
+# session authenticated git mediator). This avoids the anonymous
+# `api.github.com` rate limit (`HTTP 403 — API rate limit exceeded for
+# <CCoW egress IP>`) that PRs sharing one outbound IP routinely hit, observed
+# in ippoan/auth-worker#174 final-verify.
+#
+# Anonymous `api.github.com` is kept as a fallback for local CLI runs.
+_proxy_origin="$(git -C "$PROJECT_DIR" remote get-url origin 2>/dev/null || true)"
+if [[ "$_proxy_origin" == *"local_proxy@"*"/git/"* ]]; then
+  _proxy_base="${_proxy_origin%/git/*}"
+  _target_remote="${_proxy_base}/git/$REPO"
+  echo "[install-mcp] resolving release tag via CCoW git proxy ($CHANNEL)..." >&2
+  ALL_TAGS="$(git ls-remote --tags --refs "$_target_remote" 2>/dev/null \
+              | awk -F'refs/tags/' '/refs\/tags\// {print $2}')"
+else
+  echo "[install-mcp] resolving release tag via api.github.com ($CHANNEL)..." >&2
+  ALL_TAGS="$(curl -sSfL "https://api.github.com/repos/$REPO/git/refs/tags?per_page=100" 2>/dev/null \
+              | grep -oE '"ref"[[:space:]]*:[[:space:]]*"refs/tags/[^"]+"' \
+              | sed -E 's|^.*refs/tags/||;s|"$||' || true)"
+fi
+
 if [ -n "${REF_FILES_MCP_PIN_TAG:-}" ]; then
   TAG="$REF_FILES_MCP_PIN_TAG"
 elif [ "$CHANNEL" = "dev" ]; then
-  echo "[install-mcp] resolving latest dev release tag (channel=dev)..." >&2
-  DEV_N="$(curl -sSfL "https://api.github.com/repos/$REPO/releases?per_page=100" \
-            | grep -oE '"tag_name"[[:space:]]*:[[:space:]]*"dev-[0-9]+"' \
-            | cut -d'"' -f4 \
+  DEV_N="$(printf '%s\n' "$ALL_TAGS" \
+            | grep -E '^dev-[0-9]+$' \
             | sed 's|^dev-||' \
             | sort -n \
             | tail -1 || true)"
@@ -106,10 +128,14 @@ elif [ "$CHANNEL" != "stable" ]; then
   echo "[install-mcp] ERROR: unknown REF_FILES_MCP_CHANNEL=$CHANNEL (expected: stable, dev)" >&2
   exit 1
 else
-  echo "[install-mcp] resolving latest release tag (channel=stable)..." >&2
-  TAG="$(curl -sSfL "https://api.github.com/repos/$REPO/releases/latest" \
-          | grep -oE '"tag_name"[[:space:]]*:[[:space:]]*"[^"]+"' \
-          | head -1 | cut -d'"' -f4)"
+  TAG="$(printf '%s\n' "$ALL_TAGS" \
+          | grep -E "^${BIN_NAME}-v[0-9]+\\.[0-9]+\\.[0-9]+\$" \
+          | sort -V | tail -1 || true)"
+  if [ -z "$TAG" ]; then
+    TAG="$(printf '%s\n' "$ALL_TAGS" \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+            | sort -V | tail -1 || true)"
+  fi
 fi
 if [ -z "${TAG:-}" ]; then
   echo "[install-mcp] ERROR: could not resolve a release tag for $REPO (channel=$CHANNEL)" >&2
