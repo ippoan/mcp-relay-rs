@@ -1,0 +1,55 @@
+name: release
+
+# tag push 起点で per-binary tarball + sha256 を build / upload する。issue #9
+# Phase 2.B。ippoan/ci-workflows#27 で拡張した reusable `rust-binary-release.yml`
+# (`package` + `tag_strip_prefix`) を caller として呼ぶだけの薄い caller。
+#
+# 対応 tag pattern:
+#   - `dev-*`                     → main push 由来の自動 dev release。**全 binary** build。
+#   - `v*`                        → tag-release.yml が採番した monorepo-wide stable。**全 binary** build。
+#   - `<bin>-v*`                  → per-binary stable release。**該当 binary 1 つだけ** build。
+#                                   (例: `github-mcp-server-rs-v0.0.18`)
+#
+# install-mcp.sh が download する asset 名 (`<bin>-<tag>-target.tar.gz`) は
+# `tag_strip_prefix` によって per-binary tag でも doubling せず、旧
+# ippoan/github-mcp-server-rs の release format と完全互換に保つ。
+
+on:
+  push:
+    tags:
+      - "dev-*"
+      - "v*"
+      - "github-mcp-server-rs-v*"
+      # Phase 3 で ref-files-mcp-server-rs を吸収する時に追加:
+      # - "ref-files-mcp-server-rs-v*"
+
+permissions:
+  contents: write
+
+jobs:
+  # `github-mcp-server-rs` binary release。
+  #
+  # 起動条件: tag が下記いずれか:
+  #   - `github-mcp-server-rs-v*`  (= per-binary stable、`tag_strip_prefix` で剥がす)
+  #   - `dev-*`                    (= monorepo dev release、全 binary 含める)
+  #   - `v*`                       (= monorepo-wide stable、全 binary 含める)
+  #
+  # `tag_strip_prefix: github-mcp-server-rs-` は per-binary tag のみで効く
+  # (`dev-*` / `v*` には prefix が無いので no-op)。
+  github-mcp-server-rs:
+    if: |
+      startsWith(github.ref_name, 'github-mcp-server-rs-v') ||
+      startsWith(github.ref_name, 'dev-') ||
+      startsWith(github.ref_name, 'v')
+    uses: ippoan/ci-workflows/.github/workflows/rust-binary-release.yml@main
+    with:
+      bin_name: github-mcp-server-rs
+      package: github-mcp-server-rs
+      tag_strip_prefix: github-mcp-server-rs-
+    permissions:
+      contents: write
+    secrets:
+      # build.rs が読んで release binary に embed する quasi-public な auth-worker
+      # introspect secret (#25)。未登録の場合は空文字列が渡り、binary は dev
+      # fallback (`"dev-secret-do-not-use"`) に落ちる。
+      MCP_INTERNAL_SECRET: ${{ secrets.MCP_INTERNAL_SECRET }}

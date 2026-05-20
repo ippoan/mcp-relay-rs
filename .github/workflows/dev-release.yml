@@ -1,16 +1,14 @@
 name: Dev Release
 
-# main 上の lib 変更を自動で `dev-N` tag 採番 + push + GitHub Release 作成
-# (--prerelease) を 1-workflow で完結させる。
+# main 上の binary 含む変更を自動で `dev-N` tag 採番 + push する。tag push 後に
+# `release.yml` (`on: push: tags: ["dev-*"]`) が連鎖発火して、per-binary tarball を
+# build + GitHub Release を作成 + asset を attach する。
 #
-# `ippoan/ci-workflows/dev-tag-release.yml` の Mode B (create_release: true) を
-# 使うので TAG_RELEASE_PAT は不要 (GITHUB_TOKEN だけで push + release 作成可能)。
-# 本 repo は lib crate なので binary build / asset attach も無い。
-#
-# 旧 design: tag push → release.yml (`on: push: tags: ["dev-*"]`) を別 workflow
-# 発火させる 2-step chain は、tag push を GITHUB_TOKEN でやると他 workflow が
-# trigger されない GitHub Actions の制約があり TAG_RELEASE_PAT が必須だった。
-# create_release: true で内部完結させることでこの制約から脱却している。
+# Mode A (`create_release: false`) を使用 — issue #9 Phase 2.B で binary release を
+# 動かすため、release.yml チェーンが必要。GITHUB_TOKEN-pushed tag は他 workflow を
+# trigger しない GitHub Actions 制約があるため `TAG_RELEASE_PAT` で push する必要がある。
+# (Phase 1 までは lib-only で `create_release: true` Mode B を使っていたが、binary が
+# 入った Phase 2 以降は release.yml で multi-asset attach する Mode A に戻す。)
 
 on:
   push:
@@ -34,6 +32,8 @@ jobs:
   dev-release:
     uses: ippoan/ci-workflows/.github/workflows/dev-tag-release.yml@main
     with:
-      create_release: true
+      create_release: false   # Mode A — tag push only, release.yml が後段で release 作成
     permissions:
       contents: write
+    secrets:
+      TAG_RELEASE_PAT: ${{ secrets.TAG_RELEASE_PAT }}
