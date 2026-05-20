@@ -339,5 +339,19 @@ mod tests {
             1
         );
         assert_eq!(sample_req().version(), 1);
+        // issue #178: 全 variant 個別に version() を呼んで、 multi-arm match の
+        // 全 arm を coverage 上踏破させる (coverage_100.toml で frame.rs は
+        // 100% line coverage 要求のため)。
+        let resp = Frame::resp("r", 200, BTreeMap::new(), b"");
+        assert_eq!(resp.version(), 1);
+        assert_eq!(
+            (Frame::Ping {
+                v: FRAME_VERSION,
+                id: "p".into()
+            })
+            .version(),
+            1
+        );
+        assert_eq!(Frame::pong("p").version(), 1);
     }
 }

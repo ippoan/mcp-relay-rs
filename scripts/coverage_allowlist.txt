@@ -19,8 +19,10 @@
 
 # --- test-assertion-panic ---
 # Paths shifted to `crates/mcp-relay/src/...` in issue #9 Phase 1 monorepo化.
-crates/mcp-relay/src/relay/frame.rs:198  # `_ => panic!("expected Hello")` 残余 arm
-crates/mcp-relay/src/relay/frame.rs:252  # `else { panic!("expected Req") }`
+# Line numbers shift again with issue #178 (Ping/Pong frame + keepalive_supported)。
+crates/mcp-relay/src/relay/frame.rs:238  # `_ => panic!("expected Hello")` 残余 arm (旧 198)
+crates/mcp-relay/src/relay/frame.rs:277  # `_ => panic!("expected Pong")` 残余 arm (issue #178)
+crates/mcp-relay/src/relay/frame.rs:331  # `else { panic!("expected Req") }` (旧 252)
 
 # --- defensive-body-error ---
 crates/mcp-relay/src/relay/bridge.rs:69  # `Err(e) => error_resp(500, "response collect failed: {e}")`
