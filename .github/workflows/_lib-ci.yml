@@ -1,0 +1,72 @@
+name: lib-ci
+
+# Local reusable workflow — emit the 4 check names branch protection requires
+# (`<caller_job> / rustfmt` 等)。`ippoan/ci-workflows/rust-ci.yml` は
+# `binary_name` 必須で lib-only crate には流用できないので、binary smoke 抜きの
+# 縮小版を本 repo 内に同梱する。Phase 2/3 で binary を吸収したら
+# `ippoan/ci-workflows/rust-ci.yml` reusable に乗り換え可能。
+#
+# 呼び出し側 (`.github/workflows/ci.yml`):
+#
+#   jobs:
+#     ci:                                                   # ← この key が check name の prefix
+#       uses: ./.github/workflows/_lib-ci.yml
+#
+# → check names: `ci / rustfmt`, `ci / clippy`, `ci / cargo test`, `ci / cargo build --release`
+
+on:
+  workflow_call:
+    inputs:
+      shared_key:
+        required: false
+        type: string
+        default: mcp-relay-rs
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rustfmt:
+    name: rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all -- --check
+
+  clippy:
+    name: clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ${{ inputs.shared_key }}
+      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+  cargo-test:
+    name: cargo test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ${{ inputs.shared_key }}
+      - run: cargo test --workspace --all-targets --all-features --no-fail-fast
+
+  cargo-build-release:
+    name: cargo build --release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ${{ inputs.shared_key }}
+      - run: cargo build --release --workspace --locked

@@ -9,64 +9,24 @@ concurrency:
   cancel-in-progress: true
 
 # `push: main` trigger は意図的に外している。PR の auto-merge gate
-# (rustfmt / clippy / cargo test / cargo build --release / coverage / bazel-build
-# が全 green でないと merge できない) で main 品質を保つ前提なので、main push 後に
-# 同じ test を再走させるのは無駄。main push 起点で走るのは dev-release.yml だけ。
+# (ci / rustfmt / clippy / cargo test / cargo build --release / coverage /
+# bazel-build が全 green でないと merge できない) で main 品質を保つ前提なので、
+# main push 後に同じ test を再走させるのは無駄。main push 起点で走るのは
+# dev-release.yml だけ。
 
 permissions:
   contents: write
   pull-requests: write
 
 jobs:
-  # 4 job split to satisfy branch-protection required checks
-  # (`ci / rustfmt`, `ci / clippy`, `ci / cargo test`, `ci / cargo build --release`).
-  # ippoan/ci-workflows の rust-ci.yml reusable は binary_name 必須なので、
-  # lib-only な本 crate では inline で同 job 名を出す。Phase 2/3 で binary 追加後は
-  # reusable に乗り換えることも可能。
-  rustfmt:
-    name: rustfmt
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt
-      - run: cargo fmt --all -- --check
-
-  clippy:
-    name: clippy
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
-      - uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: mcp-relay-rs
-      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
-
-  cargo-test:
-    name: cargo test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: mcp-relay-rs
-      - run: cargo test --workspace --all-targets --all-features --no-fail-fast
-
-  cargo-build-release:
-    name: cargo build --release
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: mcp-relay-rs
-      - run: cargo build --release --workspace --locked
+  # job key `ci` で local reusable を呼ぶことで、check name が
+  # `ci / rustfmt` / `ci / clippy` / `ci / cargo test` / `ci / cargo build --release`
+  # の 4 つになる (= `ippoan-rust-default` preset が要求する required check 名と一致)。
+  # 各 job の中身は `_lib-ci.yml` を参照。
+  ci:
+    uses: ./.github/workflows/_lib-ci.yml
+    with:
+      shared_key: mcp-relay-rs
 
   # 100% line coverage gate on files registered in coverage_100.toml.
   # Issue #9 Phase 1 で path が `crates/mcp-relay/src/...` に shift したので
@@ -99,13 +59,12 @@ jobs:
   # action で disk-cache + external-cache + repository-cache を有効化。matrix は
   # Phase 2/3 で binary を吸収した時に `//binaries/<name>` を加えて split build に拡張。
   #
-  # **cargo 4 job + coverage を gate に置く**: cargo 側が落ちている状態で Bazel
-  # build runner を回しても根本原因 reveal が遅れるだけで runner 時間の無駄なので、
-  # 全て success の時のみ起動する (Phase 2/3 で binary build matrix が増えた時の
-  # cost を見越した先回り)。
+  # **ci (cargo 4 job) + coverage を gate に置く**: cargo 側が落ちている状態で
+  # Bazel build runner を回しても根本原因 reveal が遅れるだけで runner 時間の無駄
+  # なので、両方 success の時のみ起動する。
   bazel-build:
     name: bazel build
-    needs: [rustfmt, clippy, cargo-test, cargo-build-release, coverage]
+    needs: [ci, coverage]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -127,15 +86,12 @@ jobs:
 
   auto-merge:
     name: Auto Merge
-    needs: [rustfmt, clippy, cargo-test, cargo-build-release, coverage, bazel-build]
+    needs: [ci, coverage, bazel-build]
     if: >-
       always() &&
       github.event_name == 'pull_request' &&
       github.event.pull_request.draft == false &&
-      needs.rustfmt.result == 'success' &&
-      needs.clippy.result == 'success' &&
-      needs.cargo-test.result == 'success' &&
-      needs.cargo-build-release.result == 'success' &&
+      needs.ci.result == 'success' &&
       needs.coverage.result == 'success' &&
       needs.bazel-build.result == 'success'
     uses: ippoan/ci-workflows/.github/workflows/auto-merge.yml@main
