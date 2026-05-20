@@ -13,6 +13,24 @@
 fn main() {
     println!("cargo:rerun-if-env-changed=MCP_INTERNAL_SECRET");
     let value = std::env::var("MCP_INTERNAL_SECRET").unwrap_or_default();
+    // Surface in CI log whether the secret was actually injected at build time
+    // (length only — never log the value itself). Without this diagnostic,
+    // a missing repo secret silently falls through to the dev fallback
+    // `"dev-secret-do-not-use"` and the binary returns 401 from
+    // `/mcp/introspect` against staging — observed in
+    // ippoan/auth-worker#174 final-verify before the repo secret was set.
+    if value.is_empty() {
+        println!(
+            "cargo:warning=MCP_INTERNAL_SECRET not provided at build time \
+             — release binary will fall back to `dev-secret-do-not-use` \
+             and fail `/mcp/introspect` against any non-dev auth-worker"
+        );
+    } else {
+        println!(
+            "cargo:warning=MCP_INTERNAL_SECRET embedded (len={})",
+            value.len()
+        );
+    }
     println!("cargo:rustc-env=MCP_INTERNAL_SECRET={}", value);
 
     // GitHub Actions の tag push (release.yml on `tags: ["v*"]`) では
