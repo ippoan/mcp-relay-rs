@@ -119,7 +119,8 @@ fi
 # Per-binary stable tag は `ref-files-mcp-server-rs-v0.0.X` の形で打たれる
 # (`release.yml` の `tag_strip_prefix: ref-files-mcp-server-rs-` と対称)。
 # 詳細は install-mcp.sh (github 用) の同じ block を参照。
-ASSET_TAG="${TAG#${BIN_NAME}-}"
+# (quoted expansion は shellcheck SC2295 回避用、bash 4.4+ の literal-strip)
+ASSET_TAG="${TAG#"${BIN_NAME}-"}"
 
 INSTALLED_TAG=""
 [ -s "$TAG_FILE" ] && INSTALLED_TAG="$(cat "$TAG_FILE" 2>/dev/null || true)"

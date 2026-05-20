@@ -135,7 +135,8 @@ fi
 #   - tag = v0.0.1 (monorepo-wide)        → asset = github-mcp-server-rs-v0.0.1-...
 #   - tag = dev-5                         → asset = github-mcp-server-rs-dev-5-...
 # URL path のほうは元 tag をそのまま使う。
-ASSET_TAG="${TAG#${BIN_NAME}-}"
+# (quoted expansion は shellcheck SC2295 回避用、bash 4.4+ の literal-strip)
+ASSET_TAG="${TAG#"${BIN_NAME}-"}"
 
 INSTALLED_TAG=""
 [ -s "$TAG_FILE" ] && INSTALLED_TAG="$(cat "$TAG_FILE" 2>/dev/null || true)"

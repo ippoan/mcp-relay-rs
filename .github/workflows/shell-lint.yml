@@ -6,6 +6,9 @@ name: shell-lint
 # 旧 `ippoan/github-mcp-server-rs` / `ippoan/ref-files-mcp-server-rs` には
 # 同等の CI が無く、syntax error が main に landing する事故余地があった。
 # monorepo 化に合わせて gate を追加。
+#
+# Severity = `error`: 実際に consumer を壊すクラスの violation だけ fail にして、
+# style level (SC2295 等) は警告に留める。bash -n は syntax error を捕まえる並行 gate。
 
 on:
   pull_request:
@@ -40,9 +43,6 @@ jobs:
           for f in "${files[@]}"; do
             echo "::group::$f"
             bash -n "$f"
-            # SC1091: don't follow source. SC2155: declare-and-assign — both
-            # hit existing patterns in the hook (e.g. `nohup ... &` PID
-            # capture) that are intentional and read fine.
-            shellcheck --shell=bash --severity=warning "$f"
+            shellcheck --shell=bash --severity=error "$f"
             echo "::endgroup::"
           done
