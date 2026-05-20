@@ -14,3 +14,9 @@ lcov.info
 
 # Bazel
 /bazel-*
+
+# ts-rs (binaries/ref-files-mcp-server-rs の gen-ts bin が生成)。
+# ref-files-worker CI が同 binary を実行して比較するので、本 monorepo 側で
+# commit すると 2 source of truth になる。Phase 3 (#9) で吸収時に追加。
+**/ts-bindings/
+**/bindings/

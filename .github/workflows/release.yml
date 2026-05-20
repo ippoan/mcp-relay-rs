@@ -20,8 +20,7 @@ on:
       - "dev-*"
       - "v*"
       - "github-mcp-server-rs-v*"
-      # Phase 3 で ref-files-mcp-server-rs を吸収する時に追加:
-      # - "ref-files-mcp-server-rs-v*"
+      - "ref-files-mcp-server-rs-v*"
 
 permissions:
   contents: write
@@ -52,4 +51,29 @@ jobs:
       # build.rs が読んで release binary に embed する quasi-public な auth-worker
       # introspect secret (#25)。未登録の場合は空文字列が渡り、binary は dev
       # fallback (`"dev-secret-do-not-use"`) に落ちる。
+      MCP_INTERNAL_SECRET: ${{ secrets.MCP_INTERNAL_SECRET }}
+
+  # `ref-files-mcp-server-rs` binary release (issue #9 Phase 3 で追加)。
+  #
+  # 起動条件: tag が下記いずれか:
+  #   - `ref-files-mcp-server-rs-v*` (= per-binary stable)
+  #   - `dev-*`                      (= monorepo dev release)
+  #   - `v*`                         (= monorepo-wide stable)
+  #
+  # 注: cargo build --release -p ref-files-mcp-server-rs で 2 binary (`ref-files-mcp-server-rs`
+  # + `gen-ts`) が compile されるが、reusable は `bin_name` 指定のものだけ archive する。
+  # `gen-ts` は CI ローカル用なので release asset には含めない。
+  ref-files-mcp-server-rs:
+    if: |
+      startsWith(github.ref_name, 'ref-files-mcp-server-rs-v') ||
+      startsWith(github.ref_name, 'dev-') ||
+      startsWith(github.ref_name, 'v')
+    uses: ippoan/ci-workflows/.github/workflows/rust-binary-release.yml@main
+    with:
+      bin_name: ref-files-mcp-server-rs
+      package: ref-files-mcp-server-rs
+      tag_strip_prefix: ref-files-mcp-server-rs-
+    permissions:
+      contents: write
+    secrets:
       MCP_INTERNAL_SECRET: ${{ secrets.MCP_INTERNAL_SECRET }}

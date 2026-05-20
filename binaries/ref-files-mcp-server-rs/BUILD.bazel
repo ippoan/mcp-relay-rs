@@ -1,0 +1,78 @@
+load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library", "rust_test")
+load("@crates//:defs.bzl", "all_crate_deps")
+
+# ref-files-mcp-server-rs (issue #9 Phase 3 で吸収)。
+# 構成: lib + 2 binary (main + gen-ts)。rust-alc-api の同 pattern。
+
+# Library — main.rs / bin/gen-ts.rs 以外の全 src を含む。
+# crate_name は cargo の `[lib]` (= package `ref-files-mcp-server-rs` の hyphen→underscore)
+# にあわせて `ref_files_mcp_server_rs` を維持。
+rust_library(
+    name = "ref-files-mcp-server-rs",
+    srcs = glob(
+        ["src/**/*.rs"],
+        exclude = [
+            "src/main.rs",
+            "src/bin/**",
+        ],
+    ),
+    crate_name = "ref_files_mcp_server_rs",
+    deps = all_crate_deps(normal = True) + [
+        "//crates/mcp-relay",
+    ],
+    proc_macro_deps = all_crate_deps(proc_macro = True),
+    edition = "2021",
+    visibility = ["//visibility:public"],
+)
+
+# Main binary — relay / serve / pair / auth subcommands を提供する MCP server。
+rust_binary(
+    name = "ref-files-mcp-server-rs_bin",
+    srcs = ["src/main.rs"],
+    deps = [
+        ":ref-files-mcp-server-rs",
+    ] + all_crate_deps(normal = True) + [
+        "//crates/mcp-relay",
+    ],
+    proc_macro_deps = all_crate_deps(proc_macro = True),
+    edition = "2021",
+    # cargo の `[[bin]] name = "ref-files-mcp-server-rs"` と一致させる。
+    # target name (`:ref-files-mcp-server-rs_bin`) は lib との衝突回避のため `_bin` suffix。
+    crate_name = "ref_files_mcp_server_rs_bin",
+    rustc_env = {
+        # build.rs 互換性 — github-mcp-server-rs と同 pattern。Phase 2.B follow-up
+        # で `cargo_build_script` rule に置換予定。
+        "BUILD_RELEASE_TAG": "",
+        "MCP_INTERNAL_SECRET": "",
+    },
+    visibility = ["//visibility:public"],
+)
+
+# gen-ts binary — ts-bindings/ ディレクトリに TypeScript declaration を emit。
+# ref-files-worker の sync-types CI が grep するので別 target で build 可能に。
+rust_binary(
+    name = "gen-ts",
+    srcs = ["src/bin/gen-ts.rs"],
+    deps = [
+        ":ref-files-mcp-server-rs",
+    ] + all_crate_deps(normal = True) + [
+        "//crates/mcp-relay",
+    ],
+    proc_macro_deps = all_crate_deps(proc_macro = True),
+    edition = "2021",
+    rustc_env = {
+        "BUILD_RELEASE_TAG": "",
+        "MCP_INTERNAL_SECRET": "",
+    },
+    visibility = ["//visibility:public"],
+)
+
+rust_test(
+    name = "ref-files-mcp-server-rs_test",
+    crate = ":ref-files-mcp-server-rs",
+    deps = all_crate_deps(normal_dev = True) + [
+        "//crates/mcp-relay",
+    ],
+    proc_macro_deps = all_crate_deps(proc_macro_dev = True),
+    edition = "2021",
+)

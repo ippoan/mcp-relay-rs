@@ -20,6 +20,7 @@ crate.from_cargo(
         "//:Cargo.toml",
         "//crates/mcp-relay:Cargo.toml",
         "//binaries/github-mcp-server-rs:Cargo.toml",
+        "//binaries/ref-files-mcp-server-rs:Cargo.toml",
     ],
 )
 
