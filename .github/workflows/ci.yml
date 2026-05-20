@@ -75,8 +75,14 @@ jobs:
   # Bazel build (issue #9 Phase 1) — rust-alc-api と同じ `ippoan/setup-bazel@main`
   # action で disk-cache + external-cache + repository-cache を有効化。matrix は
   # Phase 2/3 で binary を吸収した時に `//binaries/<name>` を加えて split build に拡張。
+  #
+  # **lib-ci + coverage を gate に置く**: cargo 側 (fmt/clippy/test/coverage) が
+  # 落ちている状態で Bazel build runner を回しても根本原因 reveal が遅れるだけで
+  # runner 時間の無駄なので、両方 success の時のみ起動する (Phase 2/3 で binary
+  # build matrix が増えた時の cost を見越した先回り)。
   bazel-build:
     name: bazel build
+    needs: [lib-ci, coverage]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
