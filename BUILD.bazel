@@ -1,0 +1,3 @@
+# Workspace root has no Rust target — all packages live under //crates and
+# (future) //binaries. Keep this file for future aggregator alias targets
+# (e.g. `//:all_binaries` matrix entry) when issue #9 Phase 2/3 lands.

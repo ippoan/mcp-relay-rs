@@ -4,8 +4,8 @@
 # a mock harness) are excluded entirely by `--ignore-filename-regex`.
 #
 # Convention copied from `ippoan/cc-relay/scripts/coverage_gate.sh`,
-# adapted for this single-crate lib (no `--workspace`, paths rooted at
-# `src/...`).
+# adapted for the monorepo workspace (issue #9 Phase 1). Paths are
+# rooted at `crates/<member>/src/...`.
 
 set -euo pipefail
 
@@ -13,9 +13,10 @@ cd "$(dirname "$0")/.."
 
 # Files NOT enforced — real-IO loops / pure re-export modules.
 # Add to coverage_100.toml + drop from here as tests are added.
-IGNORE_REGEX='src/auth\.rs|src/relay/mod\.rs|src/lib\.rs'
+# Patterns match the FULL path emitted by llvm-cov (`crates/mcp-relay/src/...`).
+IGNORE_REGEX='crates/mcp-relay/src/auth\.rs|crates/mcp-relay/src/relay/mod\.rs|crates/mcp-relay/src/lib\.rs'
 
-cargo llvm-cov --all-features --no-fail-fast --no-report
+cargo llvm-cov --workspace --all-features --no-fail-fast --no-report
 
 cargo llvm-cov report --summary-only \
     --ignore-filename-regex "$IGNORE_REGEX" \
@@ -78,9 +79,12 @@ for i in range(1, len(parts), 2):
     if "/registry/" in path or "/.cargo/" in path:
         continue
 
-    # Normalize to a repo-relative path: keep everything from the first
-    # `src/` onwards. CI runs from `/home/runner/work/mcp-relay-rs/mcp-relay-rs/`.
-    m = re.search(r"(src/[^\s]+)$", path)
+    # Normalize to a workspace-relative path: keep everything from the first
+    # `crates/` onwards. CI runs from `/home/runner/work/mcp-relay-rs/mcp-relay-rs/`.
+    # Fallback to `src/...` for any rogue absolute path (e.g. legacy reports).
+    m = re.search(r"(crates/[^\s]+\.rs)$", path)
+    if not m:
+        m = re.search(r"(src/[^\s]+\.rs)$", path)
     rel = m.group(1) if m else path
     files_seen.add(rel)
 

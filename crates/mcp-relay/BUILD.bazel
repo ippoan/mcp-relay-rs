@@ -1,0 +1,22 @@
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+load("@crates//:defs.bzl", "all_crate_deps")
+
+# Library crate — `path = "src/lib.rs"` in Cargo.toml mirrors this `crate_root`.
+# `crate_name = "mcp_relay"` matches the `[lib].name` so downstream binaries
+# (issue #9 Phase 2/3) can `use mcp_relay::...` unchanged from the cargo path.
+rust_library(
+    name = "mcp-relay",
+    srcs = glob(["src/**/*.rs"]),
+    crate_name = "mcp_relay",
+    deps = all_crate_deps(normal = True),
+    proc_macro_deps = all_crate_deps(proc_macro = True),
+    visibility = ["//visibility:public"],
+    edition = "2021",
+)
+
+rust_test(
+    name = "mcp-relay_test",
+    crate = ":mcp-relay",
+    deps = all_crate_deps(normal_dev = True),
+    proc_macro_deps = all_crate_deps(proc_macro_dev = True),
+)

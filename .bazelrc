@@ -1,0 +1,5 @@
+# Bazel 8.1 + rules_rust 0.69 + Bzlmod の最小設定。
+# rust-alc-api `.bazelrc` を mirror (issue #9 Phase 1)。
+build --incompatible_strict_action_env
+build --action_env=PATH
+build --jobs=auto
