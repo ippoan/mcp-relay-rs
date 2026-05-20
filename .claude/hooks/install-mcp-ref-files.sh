@@ -48,7 +48,7 @@
 #   - binary installed at  $HOME/.local/bin/ref-files-mcp-server-rs
 #   - relay running (outbound WS to mcp(-staging).ippoan.org)
 #   -固定 MCP URL written to:
-#       $CLAUDE_PROJECT_DIR/.claude/mcp-state/mcp-url
+#       $CLAUDE_PROJECT_DIR/.claude/mcp-state-ref-files/mcp-url
 #     and exported as $REF_FILES_MCP_URL via $CLAUDE_ENV_FILE.
 #
 # Re-running is safe: existing binary / token cache / running relay are reused.
@@ -67,7 +67,7 @@ ENV_NAME="${REF_FILES_MCP_ENV:-staging}"
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 INSTALL_DIR="$HOME/.local/bin"
-STATE_DIR="$PROJECT_DIR/.claude/mcp-state"
+STATE_DIR="$PROJECT_DIR/.claude/mcp-state-ref-files"
 mkdir -p "$INSTALL_DIR" "$STATE_DIR"
 
 # Cleanup state files from old cloudflared-based versions (issue #27 hard-cut).
