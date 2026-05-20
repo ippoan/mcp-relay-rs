@@ -1,5 +1,9 @@
 [workspace]
-members = ["crates/mcp-relay", "binaries/github-mcp-server-rs"]
+members = [
+    "crates/mcp-relay",
+    "binaries/github-mcp-server-rs",
+    "binaries/ref-files-mcp-server-rs",
+]
 resolver = "2"
 
 # Workspace 全 member の共通 lint 設定。

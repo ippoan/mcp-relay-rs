@@ -1,0 +1,73 @@
+[package]
+name = "ref-files-mcp-server-rs"
+version = "0.1.0"
+edition = "2021"
+description = "Reference file storage MCP server (rmcp) — repo/folder/file/revision tools backed by ref-files-worker (D1 + R2)"
+license = "MIT"
+repository = "https://github.com/ippoan/mcp-relay-rs"
+# Phase 3 (issue #9) で旧 ippoan/ref-files-mcp-server-rs から本 monorepo の
+# `binaries/ref-files-mcp-server-rs/` に吸収済。`repository` は新 repo を指す。
+
+# Local MCP server entry. Streamable HTTP transport bound to 127.0.0.1 — the
+# auth-worker mcp.ippoan.org relay (`relay` bin) bridges remote clients to it,
+# matching the github-mcp-server-rs pair flow.
+[[bin]]
+name = "ref-files-mcp-server-rs"
+path = "src/main.rs"
+
+# Type generator. Emits TypeScript declarations under `ts-bindings/` via
+# `ts-rs`, which CI copies into ref-files-worker/src/types and asserts is
+# drift-free (see .github/workflows/sync-types.yml in ref-files-worker).
+[[bin]]
+name = "gen-ts"
+path = "src/bin/gen-ts.rs"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+# Phase 3 (issue #9): workspace 内 path dep に切替。
+# 旧: mcp-relay = { git = "https://github.com/ippoan/mcp-relay-rs.git", tag = "dev-1" }
+mcp-relay = { path = "../../crates/mcp-relay" }
+
+# CLI / runtime
+clap = { version = "4", features = ["derive", "env"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "signal", "sync"] }
+anyhow = "1"
+thiserror = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+# HTTP client to ref-files-worker (D1/R2 facade).
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-native-roots", "json", "stream"] }
+
+# (De)serialization. `schemars` is required by rmcp's `#[tool]` macro to derive
+# JSON Schema for tool argument types.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+schemars = "1.2.1"
+
+# rmcp + streamable HTTP transport (same feature set as github-mcp-server-rs).
+rmcp = { version = "1.6.0", features = ["server", "transport-streamable-http-server", "macros", "schemars", "server-side-http"] }
+
+# Streamable HTTP plumbing (axum is what rmcp's transport mounts on).
+axum = "0.8.9"
+tower = { version = "0.5", features = ["util"] }
+http = "1"
+
+# WS relay client (auth-worker bridge — mirrors github-mcp-server-rs/src/relay).
+tokio-tungstenite = { version = "0.24", default-features = false, features = ["connect", "handshake", "rustls-tls-native-roots"] }
+futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
+
+# Shared types (source of truth) — `ts-rs` derives emit `.ts` files via the
+# `gen-ts` bin. `serde-compat` makes #[serde(rename = ...)] propagate into the
+# generated TypeScript output, which keeps Rust and the worker DTO contract
+# in lockstep.
+ts-rs = { version = "10", features = ["serde-compat", "uuid-impl"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+base64 = "0.22"
+
+[dev-dependencies]
+tempfile = "3"
+mockito = "1"

@@ -77,6 +77,9 @@ jobs:
           # 巻き添えにならず、cache hit 率が高い状態を維持できる。
           - name: github-mcp-server-rs
             targets: "//binaries/github-mcp-server-rs:github-mcp-server-rs"
+          # Phase 3 (issue #9): ref-files-mcp-server-rs を吸収。lib + main + gen-ts。
+          - name: ref-files-mcp-server-rs
+            targets: "//binaries/ref-files-mcp-server-rs:ref-files-mcp-server-rs //binaries/ref-files-mcp-server-rs:ref-files-mcp-server-rs_bin //binaries/ref-files-mcp-server-rs:gen-ts"
     steps:
       - uses: actions/checkout@v4
 
