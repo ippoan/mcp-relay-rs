@@ -1,14 +1,21 @@
 name: Tag Release
 
-# workflow_dispatch で semver `v{major}.{minor}.{patch}` tag 採番 + push + GitHub Release
-# 作成 (--latest) を 1-workflow で完結させる。
+# workflow_dispatch で monorepo-wide な semver `v{major}.{minor}.{patch}` tag を採番 + push する。
+# tag push 後に `release.yml` (`on: push: tags: ["v*"]`) が連鎖発火して、全 binary の
+# tarball + sha256 を build + attach する。
 #
-# `ippoan/ci-workflows/tag-release.yml` の Mode B (create_release: true) を使うので
-# TAG_RELEASE_PAT は不要。binary asset attach も無し (lib crate)。
+# Mode A (`create_release: false`) — issue #9 Phase 2.B で binary release を動かすため、
+# release.yml チェーンが必要。GITHUB_TOKEN-pushed tag は他 workflow を trigger しない
+# 制約があるため `TAG_RELEASE_PAT` で push する。
 #
 # 起動方法:
 #   - ci-dashboard UI → "Tag Release" ボタン
 #   - CLI: gh workflow run tag-release.yml -R ippoan/mcp-relay-rs -f bump=patch
+#
+# Out of scope (follow-up): per-binary tag (`<bin>-v0.0.X`) の workflow_dispatch 採番。
+# release.yml は既に `github-mcp-server-rs-v*` pattern を解釈できるので、手動 tag push
+# (`git tag github-mcp-server-rs-v0.0.18 && git push --tags`) で per-binary stable も
+# release できる。tag-release.yml のフロント化は需要が出たら別 issue で。
 
 on:
   workflow_dispatch:
@@ -27,6 +34,8 @@ jobs:
     uses: ippoan/ci-workflows/.github/workflows/tag-release.yml@main
     with:
       bump: ${{ inputs.bump }}
-      create_release: true
+      create_release: false   # Mode A — tag push only, release.yml が後段で release 作成 + asset attach
     permissions:
       contents: write
+    secrets:
+      TAG_RELEASE_PAT: ${{ secrets.TAG_RELEASE_PAT }}
