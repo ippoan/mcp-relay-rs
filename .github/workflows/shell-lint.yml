@@ -1,0 +1,48 @@
+name: shell-lint
+
+# Issue #9 Phase 4: `.claude/hooks/*.sh` (= consumer repos が `curl | bash` で
+# 直接実行する hook) を CI で shellcheck + bash -n syntax check に通す。
+#
+# 旧 `ippoan/github-mcp-server-rs` / `ippoan/ref-files-mcp-server-rs` には
+# 同等の CI が無く、syntax error が main に landing する事故余地があった。
+# monorepo 化に合わせて gate を追加。
+#
+# Severity = `error`: 実際に consumer を壊すクラスの violation だけ fail にして、
+# style level (SC2295 等) は警告に留める。bash -n は syntax error を捕まえる並行 gate。
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.claude/hooks/**'
+      - '.github/workflows/shell-lint.yml'
+
+concurrency:
+  group: shell-lint-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  shellcheck:
+    name: shellcheck + bash -n
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint .claude/hooks/*.sh
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=(.claude/hooks/*.sh)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No .claude/hooks/*.sh files to lint."
+            exit 0
+          fi
+          for f in "${files[@]}"; do
+            echo "::group::$f"
+            bash -n "$f"
+            shellcheck --shell=bash --severity=error "$f"
+            echo "::endgroup::"
+          done
