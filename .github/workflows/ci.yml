@@ -8,42 +8,65 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-# `push: main` trigger は意図的に外している。PR の auto-merge gate (lib-ci +
-# coverage + bazel-build が green でないと merge できない) で main 品質を保つ
-# 前提なので、main push 後に同じ test を再走させるのは無駄。main push 起点で
-# 走るのは dev-release.yml だけ。
+# `push: main` trigger は意図的に外している。PR の auto-merge gate
+# (rustfmt / clippy / cargo test / cargo build --release / coverage / bazel-build
+# が全 green でないと merge できない) で main 品質を保つ前提なので、main push 後に
+# 同じ test を再走させるのは無駄。main push 起点で走るのは dev-release.yml だけ。
 
 permissions:
   contents: write
   pull-requests: write
 
 jobs:
-  # cargo workspace 全体の fmt + clippy + test。issue #9 Phase 1 で workspace 化
-  # したので `--workspace` を付ける。binary 追加 (Phase 2/3) 時もそのまま拡張。
-  lib-ci:
-    name: lib CI
+  # 4 job split to satisfy branch-protection required checks
+  # (`ci / rustfmt`, `ci / clippy`, `ci / cargo test`, `ci / cargo build --release`).
+  # ippoan/ci-workflows の rust-ci.yml reusable は binary_name 必須なので、
+  # lib-only な本 crate では inline で同 job 名を出す。Phase 2/3 で binary 追加後は
+  # reusable に乗り換えることも可能。
+  rustfmt:
+    name: rustfmt
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install stable Rust + components
-        uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt, clippy
+          components: rustfmt
+      - run: cargo fmt --all -- --check
 
-      - name: Cargo cache
-        uses: Swatinem/rust-cache@v2
+  clippy:
+    name: clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
         with:
           shared-key: mcp-relay-rs
+      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
-      - name: cargo fmt --check
-        run: cargo fmt --all -- --check
+  cargo-test:
+    name: cargo test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: mcp-relay-rs
+      - run: cargo test --workspace --all-targets --all-features --no-fail-fast
 
-      - name: cargo clippy
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
-
-      - name: cargo test
-        run: cargo test --workspace --all-targets --all-features --no-fail-fast
+  cargo-build-release:
+    name: cargo build --release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: mcp-relay-rs
+      - run: cargo build --release --workspace --locked
 
   # 100% line coverage gate on files registered in coverage_100.toml.
   # Issue #9 Phase 1 で path が `crates/mcp-relay/src/...` に shift したので
@@ -76,13 +99,13 @@ jobs:
   # action で disk-cache + external-cache + repository-cache を有効化。matrix は
   # Phase 2/3 で binary を吸収した時に `//binaries/<name>` を加えて split build に拡張。
   #
-  # **lib-ci + coverage を gate に置く**: cargo 側 (fmt/clippy/test/coverage) が
-  # 落ちている状態で Bazel build runner を回しても根本原因 reveal が遅れるだけで
-  # runner 時間の無駄なので、両方 success の時のみ起動する (Phase 2/3 で binary
-  # build matrix が増えた時の cost を見越した先回り)。
+  # **cargo 4 job + coverage を gate に置く**: cargo 側が落ちている状態で Bazel
+  # build runner を回しても根本原因 reveal が遅れるだけで runner 時間の無駄なので、
+  # 全て success の時のみ起動する (Phase 2/3 で binary build matrix が増えた時の
+  # cost を見越した先回り)。
   bazel-build:
     name: bazel build
-    needs: [lib-ci, coverage]
+    needs: [rustfmt, clippy, cargo-test, cargo-build-release, coverage]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -104,12 +127,15 @@ jobs:
 
   auto-merge:
     name: Auto Merge
-    needs: [lib-ci, coverage, bazel-build]
+    needs: [rustfmt, clippy, cargo-test, cargo-build-release, coverage, bazel-build]
     if: >-
       always() &&
       github.event_name == 'pull_request' &&
       github.event.pull_request.draft == false &&
-      needs.lib-ci.result == 'success' &&
+      needs.rustfmt.result == 'success' &&
+      needs.clippy.result == 'success' &&
+      needs.cargo-test.result == 'success' &&
+      needs.cargo-build-release.result == 'success' &&
       needs.coverage.result == 'success' &&
       needs.bazel-build.result == 'success'
     uses: ippoan/ci-workflows/.github/workflows/auto-merge.yml@main
