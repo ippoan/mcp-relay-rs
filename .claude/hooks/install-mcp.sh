@@ -29,10 +29,12 @@
 # Optional env (with defaults):
 #   GITHUB_MCP_ENV          staging|prod                          (default: staging)
 #   GITHUB_MCP_PIN_TAG      pin release tag (e.g. v0.0.6, dev-12) (default: resolved per channel)
-#   GITHUB_MCP_CHANNEL      stable|dev                            (default: stable)
-#                                   - stable: GitHub `releases/latest` (= 正式 v0.0.X タグ)
+#   GITHUB_MCP_CHANNEL      stable|dev                            (default: dev)
 #                                   - dev:    `releases?per_page=100` から `dev-N` の max を解決
 #                                             (= main push の度に dev-release.yml が打つ prerelease)
+#                                             デフォルト: stable v0.0.X タグはまだ運用されておらず
+#                                             channel=stable では tag 解決 fail (Refs ippoan/claude-md#38)
+#                                   - stable: GitHub `releases/latest` (= 正式 v0.0.X タグ)
 #   GITHUB_MCP_FORCE_REINSTALL=1  force re-download even when tag matches
 #   GITHUB_LOGIN            github username (REQUIRED on no-token path,
 #                                   used by 1-click pair flow as `claim_login`)
@@ -96,7 +98,7 @@ fi
 BIN="$INSTALL_DIR/$BIN_NAME"
 TAG_FILE="$BIN.tag"
 
-CHANNEL="${GITHUB_MCP_CHANNEL:-stable}"
+CHANNEL="${GITHUB_MCP_CHANNEL:-dev}"
 # Resolve tags via `git ls-remote --tags` when a CCoW git proxy is reachable
 # (the attached consumer repo's origin URL is of the form
 # `http://local_proxy@127.0.0.1:<port>/git/<owner>/<repo>` — Anthropic's per-
