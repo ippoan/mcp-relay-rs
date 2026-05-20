@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/mcp-relay"]
+members = ["crates/mcp-relay", "binaries/github-mcp-server-rs"]
 resolver = "2"
 
 # Workspace 全 member の共通 lint 設定。
@@ -7,6 +7,10 @@ resolver = "2"
 [workspace.lints.rust]
 unexpected_cfgs = { level = "allow", check-cfg = ['cfg(coverage)'] }
 
-# Release profile は member 個別の `Cargo.toml` で `[profile.release]` を書いても
-# `[workspace]` Cargo.toml の同 section が優先される (Cargo 仕様)。binary 追加 (#9
-# Phase 2/3) 時に opt-level=3 / strip=true / lto=thin を入れる前提で空欄のまま。
+# Phase 2 (#9) で binary 吸収につき release profile を有効化。旧
+# ippoan/github-mcp-server-rs/Cargo.toml の同設定を移植 — release tag の sha256
+# 互換性を保つため変更しないこと。
+[profile.release]
+opt-level = 3
+lto = "thin"
+strip = true

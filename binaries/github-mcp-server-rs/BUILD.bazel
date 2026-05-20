@@ -1,0 +1,41 @@
+load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_test")
+load("@crates//:defs.bzl", "all_crate_deps")
+
+# github-mcp-server-rs binary (issue #9 Phase 2 で吸収)。
+# rust-alc-api の binaries-like crate (carins-api / tenko-api / etc.) と同 pattern。
+#
+# crate_name は cargo の `[[bin]] name` (= `github-mcp-server-rs`) を維持。
+# 旧 repo の release asset 名と互換性を保つため改名しないこと。
+
+rust_binary(
+    name = "github-mcp-server-rs",
+    srcs = glob(["src/**/*.rs"]),
+    deps = all_crate_deps(normal = True) + [
+        "//crates/mcp-relay",
+    ],
+    proc_macro_deps = all_crate_deps(proc_macro = True),
+    edition = "2021",
+    # `build.rs` が cargo path で `cargo:rustc-env=BUILD_RELEASE_TAG=<tag>` を
+    # 発行する。Bazel は build script を別経路で扱う (= `cargo_build_script` rule
+    # が必要) ので、ここでは dev/CI build 用に空 string を直接 inject。main.rs 側に
+    # `if env!("BUILD_RELEASE_TAG").is_empty() { CARGO_PKG_VERSION } else { ... }` の
+    # fallback がある (build.rs の git ref 取得失敗時と同じ branch)。
+    # release artifact を Bazel で作る時 (Phase 2.B) に `cargo_build_script` 化する。
+    rustc_env = {
+        "BUILD_RELEASE_TAG": "",
+    },
+    visibility = ["//visibility:public"],
+)
+
+rust_test(
+    name = "github-mcp-server-rs_test",
+    srcs = glob(["src/**/*.rs"]) + glob(["tests/**/*.rs"]),
+    deps = all_crate_deps(normal_dev = True) + [
+        "//crates/mcp-relay",
+    ],
+    proc_macro_deps = all_crate_deps(proc_macro_dev = True),
+    edition = "2021",
+    rustc_env = {
+        "BUILD_RELEASE_TAG": "",
+    },
+)
