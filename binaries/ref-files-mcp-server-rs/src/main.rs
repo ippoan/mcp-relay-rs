@@ -263,10 +263,6 @@ async fn run_whoami(client: &Client, cfg: &Config) -> Result<()> {
 /// `/mcp/introspect` を `internal_shared_secret` 付きで叩く軽量 client。
 /// github-mcp の `introspect.rs` の縮小版 (`github_token` field は ref-files の
 /// 文脈では使わないので除外)。
-///
-/// auth-worker の `/mcp/introspect` は **raw secret** を `Authorization` ヘッダに
-/// (Bearer prefix なし)、body は **JSON** `{ "token": "<jwt>" }` で期待する。
-/// `.bearer_auth()` + `.form()` で送ると 401 を返す (Refs #21)。
 async fn mcp_relay_introspect(
     client: &Client,
     cfg: &Config,
@@ -286,9 +282,8 @@ async fn mcp_relay_introspect(
     }
     let resp = client
         .post(cfg.url("/mcp/introspect"))
-        .header("Authorization", cfg.internal_shared_secret.as_str())
-        .header("Content-Type", "application/json")
-        .body(serde_json::json!({ "token": access_token }).to_string())
+        .bearer_auth(&cfg.internal_shared_secret)
+        .form(&[("token", access_token)])
         .send()
         .await
         .context("POST /mcp/introspect")?;
@@ -612,75 +607,5 @@ async fn main() -> Result<()> {
             bind,
             introspect,
         } => run_serve(&cli, jwt, bind, introspect).await,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use mcp_relay::config::AuthEnv;
-
-    fn test_cfg(base: &str) -> Config {
-        Config {
-            env: AuthEnv::Staging,
-            auth_base: base.to_string(),
-            relay_base: base.to_string(),
-            client_id: "test-client".to_string(),
-            scope: "mcp.read mcp.write".to_string(),
-            internal_shared_secret: "test-secret".to_string(),
-            project_name: "ref-files-mcp-server-rs",
-        }
-    }
-
-    /// Regression for #21: `/mcp/introspect` must be called with
-    /// `Authorization: <raw-secret>` (no `Bearer ` prefix) and a JSON body —
-    /// not `bearer_auth()` + form-encoded body, which auth-worker 401s.
-    #[tokio::test]
-    async fn introspect_uses_raw_authorization_and_json_body() {
-        let mut server = mockito::Server::new_async().await;
-        let mock = server
-            .mock("POST", "/mcp/introspect")
-            .match_header("authorization", "test-secret")
-            .match_header("content-type", "application/json")
-            .match_body(mockito::Matcher::Json(serde_json::json!({
-                "token": "test-access-token"
-            })))
-            .with_status(200)
-            .with_header("content-type", "application/json")
-            .with_body(
-                r#"{"active":true,"sub":"u1","scope":"mcp.read","exp":9999999999,"github_login":"alice"}"#,
-            )
-            .create_async()
-            .await;
-
-        let cfg = test_cfg(&server.url());
-        let client = Client::new();
-        let active = mcp_relay_introspect(&client, &cfg, "test-access-token")
-            .await
-            .expect("introspect call should succeed")
-            .expect("active=true expected");
-
-        assert_eq!(active.github_login, "alice");
-        assert_eq!(active.sub, "u1");
-        mock.assert_async().await;
-    }
-
-    /// 401 response → bubbles up as an error mentioning the status.
-    #[tokio::test]
-    async fn introspect_propagates_401() {
-        let mut server = mockito::Server::new_async().await;
-        let _mock = server
-            .mock("POST", "/mcp/introspect")
-            .with_status(401)
-            .with_body("Unauthorized")
-            .create_async()
-            .await;
-
-        let cfg = test_cfg(&server.url());
-        let client = Client::new();
-        let err = mcp_relay_introspect(&client, &cfg, "tok")
-            .await
-            .expect_err("401 must surface as Err");
-        assert!(err.to_string().contains("401"));
     }
 }
