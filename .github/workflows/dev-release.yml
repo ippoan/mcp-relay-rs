@@ -24,6 +24,11 @@ on:
       - 'Cargo.lock'
       - 'MODULE.bazel'
       - '.github/workflows/dev-release.yml'
+  # Manual escape hatch — used when a `push: main` event silently fails to
+  # trigger this workflow (observed after #22 merge: paths matched but no
+  # workflow_run was scheduled, and there is no other way to re-arm the
+  # `dev-N` tag pipeline without pushing another commit to main).
+  workflow_dispatch:
 
 permissions:
   contents: write
