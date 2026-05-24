@@ -456,8 +456,23 @@ async fn writer_task(
 }
 
 /// `auth::refresh()` を呼んで TokenSet を更新、cache file にも save。
+///
+/// `refresh_token` が空 (= `grant-via-oat` silent bootstrap で取得した OAT は
+/// 長寿命を前提に `refresh_token` を発行しない設計) の場合、`/mcp/token` に
+/// `refresh_token=` を投げても auth-worker は `400 refresh_token is required`
+/// を返すだけで意味が無い。WS handshake 401 が出た時点で根本原因は別
+/// (典型例: auth-worker の `/u/<login>/connect` で aud allowlist 漏れ — see
+/// `auth-worker#199`) なので、refresh を試みず明示的に fatal exit して
+/// install-mcp.sh が pair URL 再クリックを案内できるようにする。
 async fn refresh_jwt<S>(ctx: &RelayContext<S>) -> Result<()> {
     let refresh_token = { ctx.jwt.read().await.refresh_token.clone() };
+    if refresh_token.is_empty() {
+        bail!(
+            "no refresh_token available (likely a grant-via-oat session). \
+             WS handshake 401 is not recoverable here — re-run pair or check \
+             that auth-worker accepts this aud at /u/<login>/connect."
+        );
+    }
     let new_token = auth::refresh(&ctx.http, &ctx.cfg, &refresh_token)
         .await
         .context("MCP /mcp/token refresh_token grant")?;
