@@ -99,29 +99,35 @@ BIN="$INSTALL_DIR/$BIN_NAME"
 TAG_FILE="$BIN.tag"
 
 CHANNEL="${GITHUB_MCP_CHANNEL:-dev}"
-# Resolve tags via `git ls-remote --tags` when a CCoW git proxy is reachable
-# (the attached consumer repo's origin URL is of the form
-# `http://local_proxy@127.0.0.1:<port>/git/<owner>/<repo>` — Anthropic's per-
-# session authenticated git mediator). This avoids the anonymous
-# `api.github.com` rate limit (`HTTP 403 — API rate limit exceeded for
-# <CCoW egress IP>`) that PRs sharing one outbound IP routinely hit, observed
-# in ippoan/auth-worker#174 final-verify.
+# Resolve tags via `git ls-remote --tags` over **git smart-protocol**, which is
+# anonymous-unlimited on public GitHub repos and bypasses the `api.github.com`
+# rate limit entirely. Two source candidates, tried in order:
 #
-# Anonymous `api.github.com` is kept as a fallback for local CLI runs where
-# no CCoW proxy is in effect.
+#   1. CCoW git proxy (`http://local_proxy@127.0.0.1:<port>/git/<owner>/<repo>`)
+#      — Anthropic's per-session authenticated git mediator, picked up when
+#      the attached consumer repo's origin URL has this shape.
+#   2. Anonymous `https://github.com/<owner>/<repo>.git` — universal fallback
+#      that works on every environment with git installed (local CLI runs,
+#      CI runners, CCoW containers without an attached proxy, etc).
+#
+# Both paths use `git ls-remote` over HTTPS/git protocol — neither hits
+# `api.github.com`, so the shared-IP rate-limit problem that anonymous REST
+# requests routinely run into (`HTTP 403 — API rate limit exceeded for
+# <CCoW egress IP>`, ippoan/auth-worker#174 / mcp-relay-rs#15 で観測) は
+# structurally impossible. The earlier REST fallback was removed for this
+# reason — having an "occasionally working" path was worse than a uniform
+# anonymous-git path that works regardless of CCoW proxy presence.
 _proxy_origin="$(git -C "$PROJECT_DIR" remote get-url origin 2>/dev/null || true)"
 if [[ "$_proxy_origin" == *"local_proxy@"*"/git/"* ]]; then
   _proxy_base="${_proxy_origin%/git/*}"
   _target_remote="${_proxy_base}/git/$REPO"
   echo "[install-mcp] resolving release tag via CCoW git proxy ($CHANNEL)..." >&2
-  ALL_TAGS="$(git ls-remote --tags --refs "$_target_remote" 2>/dev/null \
-              | awk -F'refs/tags/' '/refs\/tags\// {print $2}')"
 else
-  echo "[install-mcp] resolving release tag via api.github.com ($CHANNEL)..." >&2
-  ALL_TAGS="$(curl -sSfL "https://api.github.com/repos/$REPO/git/refs/tags?per_page=100" 2>/dev/null \
-              | grep -oE '"ref"[[:space:]]*:[[:space:]]*"refs/tags/[^"]+"' \
-              | sed -E 's|^.*refs/tags/||;s|"$||' || true)"
+  _target_remote="https://github.com/$REPO.git"
+  echo "[install-mcp] resolving release tag via anonymous git ls-remote ($CHANNEL)..." >&2
 fi
+ALL_TAGS="$(git ls-remote --tags --refs "$_target_remote" 2>/dev/null \
+            | awk -F'refs/tags/' '/refs\/tags\// {print $2}')"
 
 if [ -n "${GITHUB_MCP_PIN_TAG:-}" ]; then
   TAG="$GITHUB_MCP_PIN_TAG"
