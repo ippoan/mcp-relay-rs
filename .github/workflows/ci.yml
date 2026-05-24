@@ -3,6 +3,10 @@ name: ci
 on:
   pull_request:
     branches: [main]
+    # `closed` も拾うのは下段 `dev-tag` job (PR merge 後の dev-N tag 採番) のため。
+    # 既存 jobs (ci/coverage/bazel-build/auto-merge) は `if: github.event.action != 'closed'`
+    # で従来通り opened/synchronize/reopened のみで動く。
+    types: [opened, synchronize, reopened, closed]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -11,8 +15,11 @@ concurrency:
 # `push: main` trigger は意図的に外している。PR の auto-merge gate
 # (ci / rustfmt / clippy / cargo test / cargo build --release / coverage /
 # bazel-build が全 green でないと merge できない) で main 品質を保つ前提なので、
-# main push 後に同じ test を再走させるのは無駄。main push 起点で走るのは
-# dev-release.yml だけ。
+# main push 後に同じ test を再走させるのは無駄。
+# main 上の dev-N tag 採番は下段 `dev-tag` job が pull_request: closed + merged
+# 経由で行う (旧 `dev-release.yml` の `push: main` trigger が webhook 配送の
+# 信頼性問題で silent skip する事故が #22 / #24 merge 時に観測されたため、
+# pull_request: closed 経由に移行した。Refs #21)。
 
 permissions:
   contents: write
@@ -24,6 +31,7 @@ jobs:
   # の 4 つになる (= `ippoan-rust-default` preset が要求する required check 名と一致)。
   # 各 job の中身は `_lib-ci.yml` を参照。
   ci:
+    if: github.event.action != 'closed'
     uses: ./.github/workflows/_lib-ci.yml
     with:
       shared_key: mcp-relay-rs
@@ -32,6 +40,7 @@ jobs:
   # Issue #9 Phase 1 で path が `crates/mcp-relay/src/...` に shift したので
   # scripts/coverage_gate.sh も `--workspace` 経由に更新済み。
   coverage:
+    if: github.event.action != 'closed'
     name: coverage
     runs-on: ubuntu-latest
     env:
@@ -63,6 +72,7 @@ jobs:
   # Bazel build runner を回しても根本原因 reveal が遅れるだけで runner 時間の無駄
   # なので、両方 success の時のみ起動する。
   bazel-build:
+    if: github.event.action != 'closed'
     name: bazel build
     needs: [ci, coverage]
     runs-on: ubuntu-latest
@@ -98,6 +108,7 @@ jobs:
     if: >-
       always() &&
       github.event_name == 'pull_request' &&
+      github.event.action != 'closed' &&
       github.event.pull_request.draft == false &&
       needs.ci.result == 'success' &&
       needs.coverage.result == 'success' &&
@@ -108,6 +119,29 @@ jobs:
       pull-requests: write
     secrets:
       # TAG_RELEASE_PAT を auto-merge にも渡すことで、merge commit が PAT 作者で
-      # push される → post-merge workflow (dev-release.yml 等) が GitHub Actions
-      # の "GITHUB_TOKEN events don't trigger workflows" 制約を回避して発火する。
+      # push される → post-merge workflow (旧 dev-release.yml) が GitHub Actions
+      # の "GITHUB_TOKEN events don't trigger workflows" 制約を回避して発火する
+      # 設計だった。が、#22 / #24 merge では `push: main` event 自体が
+      # 発火せず dev-release.yml が silent skip したため、dev-N tag 採番は本
+      # ファイル下段 `dev-tag` job が pull_request: closed + merged 経由で行う。
       AUTO_MERGE_PAT: ${{ secrets.TAG_RELEASE_PAT }}
+
+  # 旧 `dev-release.yml` を本 ci.yml に統合 (Refs #21)。
+  # `push: main` event が #22 / #24 merge 時に silent skip された事故を回避するため、
+  # `pull_request: closed + merged == true` をトリガに dev-N tag を採番する。
+  # ref には merge_commit_sha (main 上の squash/merge 後の新 commit) を渡し、tag が
+  # main HEAD ではなく実際に merge された commit を指すようにする (= 採番 race 防止)。
+  dev-tag:
+    name: Dev Tag Release
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.merged == true
+    uses: ippoan/ci-workflows/.github/workflows/dev-tag-release.yml@main
+    with:
+      create_release: false   # Mode A — tag push only, release.yml が後段で release 作成
+      ref: ${{ github.event.pull_request.merge_commit_sha }}
+    permissions:
+      contents: write
+    secrets:
+      TAG_RELEASE_PAT: ${{ secrets.TAG_RELEASE_PAT }}
