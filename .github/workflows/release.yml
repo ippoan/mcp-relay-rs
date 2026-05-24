@@ -48,10 +48,15 @@ jobs:
     permissions:
       contents: write
     secrets:
-      # build.rs が読んで release binary に embed する quasi-public な auth-worker
-      # introspect secret (#25)。未登録の場合は空文字列が渡り、binary は dev
-      # fallback (`"dev-secret-do-not-use"`) に落ちる。
-      MCP_INTERNAL_SECRET: ${{ secrets.MCP_INTERNAL_SECRET }}
+      # build.rs が読んで release binary に embed する auth-worker introspect
+      # secret。auth-worker (Cloudflare Workers) 側の `INTERNAL_SHARED_SECRET`
+      # wrangler secret と **同じ名前・同じ値** に保つ運用 (Refs #21 で
+      # secret rotation mismatch による 401 を観測)。
+      # reusable workflow 側は input 名が `MCP_INTERNAL_SECRET` のままなので、
+      # caller でリネーム mapping するだけで内部チェーンは無変更で済む。
+      # 未登録の場合は空文字列が渡り、binary は dev fallback
+      # (`"dev-secret-do-not-use"`) に落ちる。
+      MCP_INTERNAL_SECRET: ${{ secrets.INTERNAL_SHARED_SECRET }}
 
   # `ref-files-mcp-server-rs` binary release (issue #9 Phase 3 で追加)。
   #
@@ -76,4 +81,6 @@ jobs:
     permissions:
       contents: write
     secrets:
-      MCP_INTERNAL_SECRET: ${{ secrets.MCP_INTERNAL_SECRET }}
+      # github-mcp-server-rs と同じ INTERNAL_SHARED_SECRET を embed (両 binary は
+      # 同じ auth-worker `/mcp/introspect` を叩くため値も同一であるべき)。
+      MCP_INTERNAL_SECRET: ${{ secrets.INTERNAL_SHARED_SECRET }}
