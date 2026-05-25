@@ -25,7 +25,7 @@ use tokio::sync::RwLock;
 use crate::types::{
     File, FileDeleteArgs, FileGetArgs, FileGetResponse, FileHistoryArgs, FileMoveArgs, FilePutArgs,
     FileSearchArgs, FileSearchResult, Folder, FolderCreateArgs, FolderListArgs, FolderListing,
-    Repo, RepoInitArgs, RevisionList,
+    Repo, RepoInitArgs, RepoList, RevisionList,
 };
 
 /// Configuration baked into the MCP server at startup. Phase 1 compat shape:
@@ -217,6 +217,11 @@ impl WorkerClient {
             .await
     }
 
+    pub async fn repos_list(&self) -> Result<RepoList, ErrorData> {
+        self.request::<(), RepoList>(Method::GET, "/v1/repos", None, &[])
+            .await
+    }
+
     pub async fn folder_create(&self, args: &FolderCreateArgs) -> Result<Folder, ErrorData> {
         self.request::<_, Folder>(Method::POST, "/v1/folders", Some(args), &[])
             .await
@@ -297,11 +302,13 @@ impl WorkerClient {
 }
 
 fn worker_error(status: StatusCode, body: &[u8]) -> ErrorData {
-    // The worker emits `{ error: string, reason?: string }` on non-2xx —
-    // preserve that shape so the LLM caller can distinguish (e.g.)
-    // `not_found` vs `conflict` without parsing the prose.
+    // The worker emits `{ error: string, reason?: string, hint?: ... }` on
+    // non-2xx — preserve that shape so the LLM caller can distinguish (e.g.)
+    // `not_found` vs `conflict` without parsing the prose. `hint` is opaque
+    // structured data (e.g. `{ resolved_id, name }` when a name-shaped
+    // repo_id matched an owned repo) — pass it through verbatim.
     let parsed: Result<serde_json::Value, _> = serde_json::from_slice(body);
-    let (error, reason) = match parsed {
+    let (error, reason, hint) = match parsed {
         Ok(v) => (
             v.get("error")
                 .and_then(|x| x.as_str())
@@ -310,14 +317,18 @@ fn worker_error(status: StatusCode, body: &[u8]) -> ErrorData {
             v.get("reason")
                 .and_then(|x| x.as_str())
                 .map(|s| s.to_string()),
+            v.get("hint").cloned(),
         ),
-        Err(_) => ("worker_error".into(), None),
+        Err(_) => ("worker_error".into(), None, None),
     };
-    let body = serde_json::json!({
+    let mut body = serde_json::json!({
         "status": status.as_u16(),
         "error": error,
         "reason": reason,
     });
+    if let Some(h) = hint {
+        body["hint"] = h;
+    }
     // 4xx → INVALID_PARAMS (caller can fix it). 5xx and anything else → INTERNAL_ERROR.
     let code = if status.is_client_error() {
         ErrorCode::INVALID_PARAMS

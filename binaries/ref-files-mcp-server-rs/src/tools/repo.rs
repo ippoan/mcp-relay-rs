@@ -1,4 +1,5 @@
-//! `repo_init` tool — pairs with `ref-files-worker POST /v1/repos`.
+//! `repo_init` + `repos_list` tools — pair with `ref-files-worker`'s
+//! `/v1/repos` routes.
 
 use rmcp::{
     handler::server::wrapper::Parameters,
@@ -7,7 +8,7 @@ use rmcp::{
 };
 
 use crate::mcp_server::RefFilesMcp;
-use crate::types::RepoInitArgs;
+use crate::types::{RepoInitArgs, ReposListArgs};
 
 #[tool_router(router = repo_router, vis = "pub(crate)")]
 impl RefFilesMcp {
@@ -22,6 +23,22 @@ impl RefFilesMcp {
         let repo = self.worker().repo_init(&args).await?;
         Ok(CallToolResult::success(vec![Content::text(
             serde_json::to_string(&repo).unwrap_or_default(),
+        )]))
+    }
+
+    /// List every repo the authenticated GitHub user owns. Use this to
+    /// recover a repo's `id` (UUID) from its `name` — all other tools
+    /// (`folder_*`, `file_*`) take the UUID, not the name.
+    #[tool(
+        description = "List every reference-file repo owned by the authenticated GitHub user. Returns id + name for each. Use this to look up a repo UUID before calling folder_* / file_* tools."
+    )]
+    async fn repos_list(
+        &self,
+        Parameters(_args): Parameters<ReposListArgs>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let list = self.worker().repos_list().await?;
+        Ok(CallToolResult::success(vec![Content::text(
+            serde_json::to_string(&list).unwrap_or_default(),
         )]))
     }
 }

@@ -71,7 +71,7 @@ mod tests {
     }
 
     #[test]
-    fn router_exposes_all_nine_tools() {
+    fn router_exposes_all_ten_tools() {
         let server = build();
         let mut names: Vec<String> = server
             .tool_router
@@ -92,6 +92,7 @@ mod tests {
                 "folder_create",
                 "folder_list",
                 "repo_init",
+                "repos_list",
             ]
         );
     }
