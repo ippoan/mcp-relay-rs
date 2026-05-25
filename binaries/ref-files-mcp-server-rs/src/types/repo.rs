@@ -32,3 +32,22 @@ pub struct RepoInitArgs {
     /// Repository slug. `[a-z0-9][a-z0-9._-]{0,62}`, validated server-side.
     pub name: String,
 }
+
+/// Args for `repos_list` (MCP tool). Lists every repo owned by the
+/// authenticated GitHub user.
+///
+/// `name` is the discovery counterpart to `repo_init`'s idempotency: callers
+/// can find the UUID of an existing repo without remembering what the worker
+/// minted previously. Distinct from github-mcp-server-rs's `list_repos`
+/// (GitHub API) — that's why this is named `repos_list`.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, TS, JsonSchema)]
+#[ts(export, export_to = "ts-bindings/")]
+pub struct ReposListArgs {}
+
+/// Response shape for `repos_list`.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, JsonSchema)]
+#[ts(export, export_to = "ts-bindings/")]
+#[serde(rename_all = "snake_case")]
+pub struct RepoList {
+    pub repos: Vec<Repo>,
+}

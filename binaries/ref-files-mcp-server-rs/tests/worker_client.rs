@@ -310,6 +310,60 @@ async fn worker_4xx_maps_to_invalid_params_with_reason() {
 }
 
 #[tokio::test]
+async fn repos_list_gets_v1_repos() {
+    let mut server = mockito::Server::new_async().await;
+    let m = server
+        .mock("GET", "/v1/repos")
+        .match_header("authorization", "Bearer test-jwt")
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(
+            r#"{"repos":[{"id":"r1","owner_login":"alice","name":"a","created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-01T00:00:00Z"},{"id":"r2","owner_login":"alice","name":"b","created_at":"2026-01-02T00:00:00Z","updated_at":"2026-01-02T00:00:00Z"}]}"#,
+        )
+        .create_async()
+        .await;
+    let c = client(server.url());
+    let list = c.repos_list().await.expect("repos_list");
+    assert_eq!(list.repos.len(), 2);
+    assert_eq!(list.repos[0].id, "r1");
+    assert_eq!(list.repos[1].name, "b");
+    m.assert_async().await;
+}
+
+#[tokio::test]
+async fn worker_4xx_propagates_hint_when_present() {
+    // The worker attaches `hint: { resolved_id, name }` when the caller
+    // passed a repo name instead of the UUID — make sure that round-trips
+    // through `worker_error` so the LLM caller sees it.
+    let mut server = mockito::Server::new_async().await;
+    let _m = server
+        .mock("GET", "/v1/folders")
+        .match_query(mockito::Matcher::Any)
+        .with_status(404)
+        .with_body(
+            r#"{"error":"not_found","reason":"repo","hint":{"resolved_id":"86b5c764-08cc-4e34-84b2-d0166cd37451","name":"claude-skills"}}"#,
+        )
+        .create_async()
+        .await;
+    let c = client(server.url());
+    let err = c
+        .folder_list(&FolderListArgs {
+            repo_id: "claude-skills".into(),
+            path: String::new(),
+            recursive: false,
+        })
+        .await
+        .expect_err("should fail");
+    let msg = err.message.to_string();
+    assert!(msg.contains("not_found"), "msg = {msg}");
+    assert!(
+        msg.contains("86b5c764-08cc-4e34-84b2-d0166cd37451"),
+        "msg = {msg}"
+    );
+    assert!(msg.contains("\"name\":\"claude-skills\""), "msg = {msg}");
+}
+
+#[tokio::test]
 async fn worker_5xx_maps_to_internal_error() {
     let mut server = mockito::Server::new_async().await;
     let _m = server

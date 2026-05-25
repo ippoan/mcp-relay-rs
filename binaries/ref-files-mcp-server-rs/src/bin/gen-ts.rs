@@ -32,6 +32,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Repo
     Repo::export()?;
     RepoInitArgs::export()?;
+    ReposListArgs::export()?;
+    RepoList::export()?;
 
     // Folder
     Folder::export()?;
