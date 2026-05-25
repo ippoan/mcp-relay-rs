@@ -33,7 +33,7 @@ use crate::types::{
 /// では `WorkerClient::with_refreshable_token` を直接呼ぶ。
 #[derive(Debug, Clone)]
 pub struct WorkerConfig {
-    /// e.g. `https://ref-files-staging.ippoan.org` or `http://127.0.0.1:8787` for vitest/dev.
+    /// e.g. `https://ref-files.ippoan.org` or `http://127.0.0.1:8787` for vitest/dev.
     pub base_url: String,
     /// Phase 1: 固定 JWT を caller (CLI / env) が渡す。Phase 2 では空文字列が
     /// 入っていても `with_refreshable_token` 経由なら無視される。

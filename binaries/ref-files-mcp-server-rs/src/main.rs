@@ -77,8 +77,8 @@ struct Cli {
     relay_base: Option<String>,
 
     /// Base URL of ref-files-worker (D1/R2 facade)。Serve / Relay / Pair すべてで使う。
-    /// 省略時は env preset (staging: `https://ref-files-staging.ippoan.org` /
-    /// prod: `https://ref-files.ippoan.org`)。
+    /// 省略時は env preset (staging / prod とも `https://ref-files.ippoan.org`)。
+    /// ref-files-worker は 2026-05-25 以降 single-env 運用 (Refs ippoan/ref-files-worker#6)。
     #[arg(long, env = "REF_FILES_WORKER_BASE", global = true)]
     worker_base: Option<String>,
 
@@ -156,12 +156,13 @@ enum Command {
     },
 }
 
-/// staging / prod の ref-files-worker base URL。
-fn default_worker_base(env: AuthEnv) -> &'static str {
-    match env {
-        AuthEnv::Staging => "https://ref-files-staging.ippoan.org",
-        AuthEnv::Prod => "https://ref-files.ippoan.org",
-    }
+/// ref-files-worker base URL (env を問わず単一 endpoint)。
+/// ref-files-worker は 2026-05-25 以降 single-env 運用に切替済
+/// (Refs ippoan/ref-files-worker#6 / PR #8) — staging / prod とも
+/// `ref-files.ippoan.org` を共有する。auth-worker / relay-worker は
+/// 引き続き env で staging / prod に分岐するため `AuthEnv` 自体は残す。
+fn default_worker_base(_env: AuthEnv) -> &'static str {
+    "https://ref-files.ippoan.org"
 }
 
 fn build_config(cli: &Cli) -> Result<Config> {
