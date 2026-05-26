@@ -5,8 +5,8 @@ pair / WS frame schema / relay loop) を提供する Rust crate。
 
 ## 利用 binary
 
-- [`ippoan/github-mcp-server-rs`](https://github.com/ippoan/github-mcp-server-rs)
-- [`ippoan/ref-files-mcp-server-rs`](https://github.com/ippoan/ref-files-mcp-server-rs)
+- [`github-mcp-server-rs`](binaries/github-mcp-server-rs/) (旧 `ippoan/github-mcp-server-rs`, archived)
+- [`ref-files-mcp-server-rs`](binaries/ref-files-mcp-server-rs/) (旧 `ippoan/ref-files-mcp-server-rs`, archived)
 
 ## 依存方法
 

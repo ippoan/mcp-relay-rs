@@ -2,7 +2,7 @@
 
 Reference file storage MCP server. Pairs with [`ref-files-worker`](https://github.com/ippoan/ref-files-worker) (Cloudflare Worker: D1 + R2) to expose a repo / folder / file / revision API as MCP tools.
 
-Architecture mirrors [`github-mcp-server-rs`](https://github.com/ippoan/github-mcp-server-rs):
+Architecture mirrors [`github-mcp-server-rs`](../github-mcp-server-rs/) (旧 `ippoan/github-mcp-server-rs`, archived):
 
 - Local Rust binary speaks **rmcp Streamable HTTP** on `127.0.0.1`.
 - All persistence is delegated to `ref-files-worker`; this binary holds no state.
