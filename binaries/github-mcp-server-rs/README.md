@@ -349,7 +349,7 @@ GitHub Projects v2 は REST surface が無く、すべて GraphQL。`repositoryO
 auth-worker `/mcp/introspect` 内の **JWT 署名検証** であり、shared secret 単体では
 github_token は引き出せない (RFC 7662 §2.1 の resource-server ↔ authz-server 境界
 のうち、resource-server 側 client auth)。詳細は
-[#25](https://github.com/ippoan/github-mcp-server-rs/issues/25) 参照。
+`ippoan/github-mcp-server-rs#25` (archived; monorepo 移行前の issue) 参照。
 
 これにより consumer (Claude Code on Web ユーザ) が自前で secret を登録する手間が
 消える (= `curl | bash` で完結する)。
@@ -466,7 +466,7 @@ curl -sSfL https://raw.githubusercontent.com/ippoan/github-mcp-server-rs/main/ex
 ```
 
 **Claude Code Web 側で secret 登録は不要** (`v0.0.5+` から
-`INTERNAL_SHARED_SECRET` は release binary に build-time embed 済 — [#25](https://github.com/ippoan/github-mcp-server-rs/issues/25))。
+`INTERNAL_SHARED_SECRET` は release binary に build-time embed 済 — `ippoan/github-mcp-server-rs#25`, archived)。
 
 セッション開始 → hook 内で device flow の URL が stderr に出るので、
 browser で開いて approve → 自動的に MCP server が立ち上がり、tunnel URL が
