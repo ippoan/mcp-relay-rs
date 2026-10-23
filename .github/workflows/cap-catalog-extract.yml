@@ -6,7 +6,13 @@ on:
     branches: [main]
 
 # Per-job permission パターン (Refs ippoan/cap-catalog#29 retroactive 改善):
-# top-level は read のみ。auto-merge job 側で write を明示 elevate する。
+# top-level は read のみ。
+#
+# auto-merge job は置かない。merge の依頼は ci.yml の Auto Merge
+# (ci / coverage / bazel-build を needs で待つ) だけが出す。ここにも置くと
+# 同じ PR に `gh pr merge --auto` が 2 か所から出て、後の側が
+# "Merge already in progress" で赤くなる (Refs ippoan/alc-app#488)。
+# extract の結果は Auto Merge の全 check 待ちで見られる。
 permissions:
   contents: read
 
@@ -15,11 +21,3 @@ jobs:
     uses: ippoan/ci-workflows/.github/workflows/catalog-extract.yml@main
     with:
       language: rust
-  auto-merge:
-    needs: [extract]
-    if: github.event_name == 'pull_request'
-    permissions:
-      contents: write
-      pull-requests: write
-    uses: ippoan/ci-workflows/.github/workflows/auto-merge.yml@main
-    secrets: inherit
