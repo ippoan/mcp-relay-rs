@@ -118,6 +118,10 @@ jobs:
       contents: write
       pull-requests: write
     secrets:
+      # auto-merge.yml は GitHub App token でしか merge しない (無いと fail loud。
+      # ippoan/ci-workflows#65)。org secret をそのまま渡す。
+      CI_APP_ID: ${{ secrets.CI_APP_ID }}
+      CI_APP_PRIVATE_KEY: ${{ secrets.CI_APP_PRIVATE_KEY }}
       # TAG_RELEASE_PAT を auto-merge にも渡すことで、merge commit が PAT 作者で
       # push される → post-merge workflow (旧 dev-release.yml) が GitHub Actions
       # の "GITHUB_TOKEN events don't trigger workflows" 制約を回避して発火する
